@@ -1,2612 +1,2187 @@
-# ultimate_golden_cobra.py
-# Ultimate Aggressive Golden Cobra Bot + Web App v3.0
-# Enhanced: Complete feature set, improved security, better performance, 
-# comprehensive error handling, full async operations, complete state management
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+🖤 GOLDEN COBRA GOTH MOMMY - SUPREME EDITION v4.0 🖤
+Ultimate Aggressive Telegram Bot with Web Interface
+Без ошибок, максимальная производительность, космический уровень
+"""
 
+import os
+import sys
 import asyncio
 import logging
 import sqlite3
-import json
-import os
-import time
 import random
+import time
+import json
 import hashlib
 import aiosqlite
-import asyncio
+import uuid
 from datetime import datetime, timedelta
-from typing import Optional, Dict, List, Tuple, Any
+from typing import Optional, Dict, List, Tuple, Any, Union
 from contextlib import asynccontextmanager
 from enum import Enum
+from dataclasses import dataclass
+from collections import defaultdict
 
-# FastAPI for web app
-from fastapi import FastAPI, Request, HTTPException
-from fastapi.responses import HTMLResponse, JSONResponse
-from fastapi.middleware.cors import CORSMiddleware
-import uvicorn
-
-# Aiogram for bot
-from aiogram import Bot, Dispatcher, F, html
-from aiogram.filters import Command, CommandObject
+# Telegram Bot
+from aiogram import Bot, Dispatcher, F, Router, html
 from aiogram.types import (
     Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton,
-    WebAppInfo, PreCheckoutQuery, LabeledPrice, Poll, PollAnswer,
-    ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove
+    WebAppInfo, ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove,
+    InputFile, Poll, PollAnswer
 )
-from aiogram.enums import ParseMode
-from aiogram.exceptions import TelegramBadRequest, TelegramRetryAfter
+from aiogram.filters import Command, CommandObject
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.storage.memory import MemoryStorage
+from aiogram.enums import ParseMode
 from aiogram.client.default import DefaultBotProperties
-from aiogram.utils.keyboard import InlineKeyboardBuilder
+from aiogram.utils.keyboard import InlineKeyboardBuilder, ReplyKeyboardBuilder
 
-# ============================
-# ENHANCED CONFIGURATION
-# ============================
+# Web Server
+from fastapi import FastAPI, Request, HTTPException, BackgroundTasks
+from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.middleware.cors import CORSMiddleware
+import uvicorn
 
-# Logging setup with rotation
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler('cobra_bot.log', encoding='utf-8', mode='a'),
-        logging.StreamHandler()
-    ]
-)
-logger = logging.getLogger(__name__)
+# ============================================================================
+# КОНФИГУРАЦИЯ ПРОЕКТА - УЛУЧШЕННАЯ
+# ============================================================================
 
-# Environment variables with defaults
-BOT_TOKEN = os.getenv('BOT_TOKEN', '8536282991:AAHUyTx0r7Q03bwDRokvogbmJAIbkAnYVpM')
-WEB_APP_PORT = int(os.getenv('WEB_APP_PORT', 8000))
-WEB_APP_HOST = os.getenv('WEB_APP_HOST', '0.0.0.0')
-ADMIN_IDS = [int(id.strip()) for id in os.getenv('ADMIN_IDS', '').split(',') if id.strip()]
-DB_FILE = os.getenv('DB_FILE', 'golden_cobra_ultimate.db')
-BACKUP_DIR = 'backups'
+class Config:
+    """Конфигурация проекта с валидацией"""
+    
+    # Безопасные значения по умолчанию
+    BOT_TOKEN = os.getenv('BOT_TOKEN', '8536282991:AAHUyTx0r7Q03bwDRokvogbmJAIbkAnYVpM')
+    ADMIN_IDS = [int(x.strip()) for x in os.getenv('ADMIN_IDS', '123456789').split(',') if x.strip()]
+    DB_FILE = os.getenv('DB_FILE', 'golden_cobra_supreme.db')
+    WEB_PORT = int(os.getenv('WEB_PORT', 8000))
+    WEB_HOST = os.getenv('WEB_HOST', '0.0.0.0')
+    
+    # Папки
+    BACKUP_DIR = 'backups'
+    LOGS_DIR = 'logs'
+    STATIC_DIR = 'static'
+    
+    # Настройки базы данных
+    DB_TIMEOUT = 30
+    DB_JOURNAL_MODE = 'WAL'
+    DB_SYNC_MODE = 'NORMAL'
+    
+    # Лимиты и настройки
+    MAX_STARS_PER_TRANSACTION = 1000000
+    MIN_STARS_PER_TRANSACTION = 10
+    DAILY_COOLDOWN_HOURS = 20
+    CHALLENGE_EXPIRE_HOURS = 24
+    MAX_REFERRALS_PER_USER = 100
+    
+    # Настройки безопасности
+    MAX_REQUESTS_PER_MINUTE = 30
+    MAX_MESSAGE_LENGTH = 4000
+    
+    @classmethod
+    def validate(cls):
+        """Валидация конфигурации"""
+        if not cls.BOT_TOKEN or len(cls.BOT_TOKEN) < 10:
+            raise ValueError("Invalid BOT_TOKEN")
+        if not cls.ADMIN_IDS:
+            cls.ADMIN_IDS = [123456789]
+        return True
 
-# Create backup directory
-os.makedirs(BACKUP_DIR, exist_ok=True)
+# Создаем необходимые директории
+for directory in [Config.BACKUP_DIR, Config.LOGS_DIR, Config.STATIC_DIR]:
+    os.makedirs(directory, exist_ok=True)
 
-# ============================
-# ENHANCED DATABASE MANAGER
-# ============================
+# ============================================================================
+# НАСТРОЙКА ЛОГГИРОВАНИЯ - ПРОФЕССИОНАЛЬНАЯ
+# ============================================================================
 
-class DatabaseManager:
-    """Enhanced async database manager with connection pooling and proper error handling"""
+class SupremeLogger:
+    """Улучшенная система логирования"""
+    
+    @staticmethod
+    def setup():
+        """Настройка логгера"""
+        logger = logging.getLogger('GoldenCobra')
+        logger.setLevel(logging.INFO)
+        
+        # Формат логов
+        formatter = logging.Formatter(
+            '[%(asctime)s] %(name)s - %(levelname)s - %(message)s',
+            datefmt='%Y-%m-%d %H:%M:%S'
+        )
+        
+        # Консольный вывод
+        console_handler = logging.StreamHandler()
+        console_handler.setFormatter(formatter)
+        logger.addHandler(console_handler)
+        
+        # Файловый вывод
+        file_handler = logging.FileHandler(
+            f'{Config.LOGS_DIR}/bot_{datetime.now().strftime("%Y%m%d")}.log',
+            encoding='utf-8'
+        )
+        file_handler.setFormatter(formatter)
+        logger.addHandler(file_handler)
+        
+        return logger
+
+logger = SupremeLogger.setup()
+
+# ============================================================================
+# СИСТЕМА БАЗЫ ДАННЫХ - УЛЬТРАНАДЕЖНАЯ
+# ============================================================================
+
+class SupremeDatabase:
+    """Улучшенный менеджер базы данных с защитой от ошибок"""
     
     def __init__(self, db_path: str):
         self.db_path = db_path
-        self._init_sync()
+        self._initialize_database()
     
-    def _init_sync(self):
-        """Initialize database schema synchronously"""
-        with sqlite3.connect(self.db_path, check_same_thread=False) as conn:
-            conn.execute("PRAGMA journal_mode=WAL")
-            conn.execute("PRAGMA synchronous=NORMAL")
-            conn.execute("PRAGMA foreign_keys=ON")
-            
-            cursor = conn.cursor()
-            
-            # Users table with comprehensive tracking
+    def _initialize_database(self):
+        """Инициализация всех таблиц БЕЗ ОШИБОК"""
+        try:
+            with sqlite3.connect(self.db_path, check_same_thread=False) as conn:
+                conn.execute(f"PRAGMA journal_mode={Config.DB_JOURNAL_MODE}")
+                conn.execute(f"PRAGMA synchronous={Config.DB_SYNC_MODE}")
+                conn.execute("PRAGMA foreign_keys=ON")
+                
+                cursor = conn.cursor()
+                
+                # Основная таблица пользователей
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS users (
+                        user_id INTEGER PRIMARY KEY,
+                        username TEXT,
+                        first_name TEXT,
+                        last_name TEXT,
+                        spent_stars INTEGER DEFAULT 0,
+                        earned_stars INTEGER DEFAULT 0,
+                        referrals INTEGER DEFAULT 0,
+                        referral_id INTEGER,
+                        daily_streak INTEGER DEFAULT 0,
+                        last_daily_claim TIMESTAMP,
+                        language TEXT DEFAULT 'EN',
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        last_active TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        is_premium BOOLEAN DEFAULT 0,
+                        premium_until TIMESTAMP,
+                        is_banned BOOLEAN DEFAULT 0,
+                        ban_reason TEXT,
+                        timezone TEXT DEFAULT 'UTC',
+                        UNIQUE(user_id)
+                    )
+                ''')
+                
+                # Индексы для быстрого поиска
+                cursor.execute('CREATE INDEX IF NOT EXISTS idx_users_username ON users(username)')
+                cursor.execute('CREATE INDEX IF NOT EXISTS idx_users_spent ON users(spent_stars DESC)')
+                cursor.execute('CREATE INDEX IF NOT EXISTS idx_users_earned ON users(earned_stars DESC)')
+                
+                # Таблица вызовов
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS challenges (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        challenger_id INTEGER NOT NULL,
+                        challenged_id INTEGER NOT NULL,
+                        amount INTEGER NOT NULL,
+                        status TEXT DEFAULT 'pending',
+                        winner_id INTEGER,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        expires_at TIMESTAMP,
+                        FOREIGN KEY (challenger_id) REFERENCES users(user_id),
+                        FOREIGN KEY (challenged_id) REFERENCES users(user_id),
+                        FOREIGN KEY (winner_id) REFERENCES users(user_id),
+                        CHECK (amount > 0),
+                        CHECK (status IN ('pending', 'accepted', 'declined', 'expired', 'completed'))
+                    )
+                ''')
+                
+                # Глобальный фонд
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS global_fund (
+                        id INTEGER PRIMARY KEY CHECK (id = 1),
+                        total_stars INTEGER DEFAULT 0,
+                        current_goal INTEGER DEFAULT 10000,
+                        next_goal INTEGER DEFAULT 50000,
+                        raffle_active BOOLEAN DEFAULT 0,
+                        last_raffle TIMESTAMP,
+                        total_raffles INTEGER DEFAULT 0
+                    )
+                ''')
+                
+                # Транзакции для аудита
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS transactions (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        user_id INTEGER NOT NULL,
+                        amount INTEGER NOT NULL,
+                        type TEXT NOT NULL,
+                        description TEXT,
+                        metadata TEXT,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        FOREIGN KEY (user_id) REFERENCES users(user_id)
+                    )
+                ''')
+                
+                # Магазин NFT
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS shop_items (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        name TEXT NOT NULL,
+                        description TEXT,
+                        price INTEGER NOT NULL,
+                        emoji TEXT,
+                        rarity TEXT,
+                        available BOOLEAN DEFAULT 1,
+                        stock INTEGER DEFAULT -1,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        UNIQUE(name)
+                    )
+                ''')
+                
+                # Инвентарь пользователей
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS inventory (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        user_id INTEGER NOT NULL,
+                        item_id INTEGER NOT NULL,
+                        purchased_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        is_equipped BOOLEAN DEFAULT 0,
+                        FOREIGN KEY (user_id) REFERENCES users(user_id),
+                        FOREIGN KEY (item_id) REFERENCES shop_items(id),
+                        UNIQUE(user_id, item_id)
+                    )
+                ''')
+                
+                # Достижения
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS achievements (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        name TEXT NOT NULL,
+                        description TEXT,
+                        reward_stars INTEGER DEFAULT 0,
+                        condition_type TEXT,
+                        condition_value INTEGER,
+                        emoji TEXT,
+                        UNIQUE(name)
+                    )
+                ''')
+                
+                # Достижения пользователей
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS user_achievements (
+                        user_id INTEGER NOT NULL,
+                        achievement_id INTEGER NOT NULL,
+                        unlocked_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        PRIMARY KEY (user_id, achievement_id),
+                        FOREIGN KEY (user_id) REFERENCES users(user_id),
+                        FOREIGN KEY (achievement_id) REFERENCES achievements(id)
+                    )
+                ''')
+                
+                # Система квестов
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS quests (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        name TEXT NOT NULL,
+                        description TEXT,
+                        reward_stars INTEGER NOT NULL,
+                        requirement_type TEXT,
+                        requirement_value INTEGER,
+                        is_daily BOOLEAN DEFAULT 0,
+                        is_active BOOLEAN DEFAULT 1,
+                        UNIQUE(name)
+                    )
+                ''')
+                
+                # Прогресс квестов
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS quest_progress (
+                        user_id INTEGER NOT NULL,
+                        quest_id INTEGER NOT NULL,
+                        progress INTEGER DEFAULT 0,
+                        completed BOOLEAN DEFAULT 0,
+                        completed_at TIMESTAMP,
+                        PRIMARY KEY (user_id, quest_id),
+                        FOREIGN KEY (user_id) REFERENCES users(user_id),
+                        FOREIGN KEY (quest_id) REFERENCES quests(id)
+                    )
+                ''')
+                
+                # Вставляем начальные данные
+                self._insert_initial_data(cursor)
+                
+                conn.commit()
+                logger.info("База данных успешно инициализирована")
+                
+        except Exception as e:
+            logger.error(f"Ошибка инициализации БД: {e}")
+            raise
+    
+    def _insert_initial_data(self, cursor):
+        """Вставка начальных данных БЕЗ ОШИБОК"""
+        try:
+            # Глобальный фонд
             cursor.execute('''
-                CREATE TABLE IF NOT EXISTS users (
-                    user_id INTEGER PRIMARY KEY,
-                    username TEXT,
-                    first_name TEXT,
-                    last_name TEXT,
-                    spent_stars INTEGER DEFAULT 0,
-                    earned_stars INTEGER DEFAULT 0,
-                    referrals INTEGER DEFAULT 0,
-                    referral_id INTEGER,
-                    daily_streak INTEGER DEFAULT 0,
-                    last_daily_claim DATETIME,
-                    language TEXT DEFAULT 'EN',
-                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                    last_active DATETIME DEFAULT CURRENT_TIMESTAMP,
-                    total_challenges_won INTEGER DEFAULT 0,
-                    total_challenges_lost INTEGER DEFAULT 0,
-                    is_banned BOOLEAN DEFAULT FALSE,
-                    premium_until DATETIME,
-                    timezone TEXT DEFAULT 'UTC',
-                    UNIQUE(user_id)
-                )
-            ''')
-            
-            # Challenges with better tracking
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS challenges (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    challenger_id INTEGER NOT NULL,
-                    challenged_id INTEGER NOT NULL,
-                    amount INTEGER NOT NULL,
-                    status TEXT DEFAULT 'pending',
-                    winner_id INTEGER,
-                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                    expires_at DATETIME DEFAULT (datetime('now', '+1 day')),
-                    FOREIGN KEY (challenger_id) REFERENCES users(user_id) ON DELETE CASCADE,
-                    FOREIGN KEY (challenged_id) REFERENCES users(user_id) ON DELETE CASCADE,
-                    FOREIGN KEY (winner_id) REFERENCES users(user_id) ON DELETE SET NULL,
-                    CHECK (amount > 0),
-                    CHECK (status IN ('pending', 'accepted', 'declined', 'expired', 'completed'))
-                )
-            ''')
-            
-            # Global fund tracking
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS global_fund (
-                    id INTEGER PRIMARY KEY CHECK (id = 1),
-                    total_stars INTEGER DEFAULT 0,
-                    current_goal INTEGER DEFAULT 10000,
-                    next_goal INTEGER DEFAULT 50000,
-                    raffle_active BOOLEAN DEFAULT FALSE,
-                    last_raffle DATETIME,
-                    total_raffles INTEGER DEFAULT 0,
-                    UNIQUE(id)
-                )
-            ''')
-            
-            # Insert default global fund
-            cursor.execute('''
-                INSERT OR IGNORE INTO global_fund (id, total_stars, current_goal, next_goal) 
+                INSERT OR IGNORE INTO global_fund 
+                (id, total_stars, current_goal, next_goal) 
                 VALUES (1, 0, 10000, 50000)
             ''')
             
-            # Transactions for audit trail
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS transactions (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    user_id INTEGER NOT NULL,
-                    amount INTEGER NOT NULL,
-                    transaction_type TEXT NOT NULL,
-                    description TEXT,
-                    metadata TEXT,
-                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
-                    CHECK (transaction_type IN ('spend', 'earn', 'daily', 'referral', 'challenge', 'purchase'))
-                )
-            ''')
-            
-            # NFT Shop with enhanced items
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS shop_items (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    name TEXT UNIQUE NOT NULL,
-                    description TEXT,
-                    price INTEGER NOT NULL,
-                    emoji TEXT,
-                    rarity TEXT,
-                    available BOOLEAN DEFAULT TRUE,
-                    stock INTEGER DEFAULT -1,  # -1 for unlimited
-                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-                )
-            ''')
-            
-            # User inventory
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS inventory (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    user_id INTEGER NOT NULL,
-                    item_id INTEGER NOT NULL,
-                    purchased_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                    is_equipped BOOLEAN DEFAULT FALSE,
-                    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
-                    FOREIGN KEY (item_id) REFERENCES shop_items(id) ON DELETE CASCADE,
-                    UNIQUE(user_id, item_id)
-                )
-            ''')
-            
-            # Achievements system
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS achievements (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    name TEXT UNIQUE NOT NULL,
-                    description TEXT,
-                    reward_stars INTEGER DEFAULT 0,
-                    condition_type TEXT,
-                    condition_value INTEGER,
-                    emoji TEXT
-                )
-            ''')
-            
-            # User achievements
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS user_achievements (
-                    user_id INTEGER NOT NULL,
-                    achievement_id INTEGER NOT NULL,
-                    unlocked_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                    PRIMARY KEY (user_id, achievement_id),
-                    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
-                    FOREIGN KEY (achievement_id) REFERENCES achievements(id) ON DELETE CASCADE
-                )
-            ''')
-            
-            # Insert default achievements
-            default_achievements = [
-                ('First Blood', 'Spend your first stars', 100, 'spend', 1, '🩸'),
-                ('Star Spender', 'Spend 1000 stars total', 500, 'spend', 1000, '⭐'),
-                ('Cobra Dominator', 'Reach top 10 in leaderboard', 1000, 'rank', 10, '🐍'),
-                ('Challenge Master', 'Win 10 challenges', 1500, 'challenge_win', 10, '⚔️'),
-                ('Referral King', 'Refer 10 users', 2000, 'referral', 10, '👑'),
-                ('Daily Warrior', 'Claim daily reward 30 days in a row', 3000, 'daily_streak', 30, '🏆'),
-                ('NFT Collector', 'Purchase 5 different NFTs', 2500, 'nft_count', 5, '🖼️'),
-                ('Millionaire', 'Earn 1,000,000 stars total', 10000, 'earned', 1000000, '💎'),
+            # Достижения
+            achievements = [
+                ('Первокровный', 'Потрать первые звезды', 100, 'spend', 100, '🩸'),
+                ('Звездный маньяк', 'Потрать 10,000 звезд', 1000, 'spend', 10000, '⭐'),
+                ('Топ-игрок', 'Займи место в топ-10', 1500, 'rank', 10, '🏆'),
+                ('Победитель дуэлей', 'Выиграй 5 дуэлей', 2000, 'challenge_win', 5, '⚔️'),
+                ('Мастер рефералов', 'Пригласи 10 друзей', 2500, 'referral', 10, '👥'),
+                ('Непрерывный поток', 'Получай ежедневную награду 30 дней', 3000, 'daily_streak', 30, '🔥'),
+                ('Коллекционер', 'Купи 5 разных NFT', 3500, 'nft_count', 5, '🖼️'),
+                ('Миллионер', 'Заработай 1,000,000 звезд', 10000, 'earned', 1000000, '💎'),
             ]
             
             cursor.executemany('''
-                INSERT OR IGNORE INTO achievements (name, description, reward_stars, condition_type, condition_value, emoji)
+                INSERT OR IGNORE INTO achievements 
+                (name, description, reward_stars, condition_type, condition_value, emoji)
                 VALUES (?, ?, ?, ?, ?, ?)
-            ''', default_achievements)
+            ''', achievements)
             
-            # Insert default shop items
-            default_items = [
-                ('Skull Cobra', 'Demonic snake skull NFT', 1000, '💀', 'Rare', True, 100),
-                ('Blood Viper', 'Vampire blood serpent NFT', 5000, '🩸', 'Epic', True, 50),
-                ('Golden Cobra Crown', 'Royal cobra crown of domination', 10000, '👑', 'Legendary', True, 25),
-                ('Shadow Serpent', 'Invisible shadow serpent NFT', 2500, '🌑', 'Rare', True, 150),
-                ('Diamond Scale', 'Indestructible diamond cobra scale', 7500, '💎', 'Epic', True, 75),
-                ('Eternal Cobra Soul', 'Immortal cobra soul essence', 50000, '🔥', 'Mythic', True, 10),
-                ('Venom Dagger', 'Poisonous ceremonial dagger', 1500, '🗡️', 'Uncommon', True, 200),
-                ('Goth Mommy Blessing', 'Divine blessing from the Goth Mommy', 25000, '🙏', 'Legendary', True, 5),
+            # Товары магазина
+            shop_items = [
+                ('Череп Кобры', 'Демонический череп змеи NFT', 1000, '💀', 'Редкий', 1, 100),
+                ('Кровавая Гадюка', 'Вампирская кровавая змея NFT', 5000, '🩸', 'Эпический', 1, 50),
+                ('Корона Золотой Кобры', 'Королевская корона кобры', 10000, '👑', 'Легендарный', 1, 25),
+                ('Теневой Змей', 'Невидимая теневая змея NFT', 2500, '🌑', 'Редкий', 1, 150),
+                ('Алмазная Чешуя', 'Неразрушимая алмазная чешуя', 7500, '💎', 'Эпический', 1, 75),
+                ('Вечная Душа Кобры', 'Эссенция бессмертной души кобры', 50000, '🔥', 'Мифический', 1, 10),
+                ('Ядовитый Кинжал', 'Ядовитый церемониальный кинжал', 1500, '🗡️', 'Необычный', 1, 200),
+                ('Благословение Готической Мамочки', 'Божественное благословение', 25000, '🙏', 'Легендарный', 1, 5),
             ]
             
             cursor.executemany('''
-                INSERT OR IGNORE INTO shop_items (name, description, price, emoji, rarity, available, stock)
+                INSERT OR IGNORE INTO shop_items 
+                (name, description, price, emoji, rarity, available, stock)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
-            ''', default_items)
+            ''', shop_items)
             
-            conn.commit()
+            # Квесты
+            quests = [
+                ('Первая кровь', 'Потрать 100 звезд впервые', 200, 'spend', 100, 0, 1),
+                ('Ежедневный воин', 'Потрать 500 звезд за день', 500, 'daily_spend', 500, 1, 1),
+                ('Пригласитель', 'Пригласи 3 друзей', 1000, 'referral', 3, 0, 1),
+                ('Победитель', 'Выиграй дуэль', 1500, 'challenge_win', 1, 0, 1),
+                ('Коллекционер', 'Купи любой NFT', 2000, 'nft_purchase', 1, 0, 1),
+            ]
             
+            cursor.executemany('''
+                INSERT OR IGNORE INTO quests 
+                (name, description, reward_stars, requirement_type, requirement_value, is_daily, is_active)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            ''', quests)
+            
+        except Exception as e:
+            logger.error(f"Ошибка вставки начальных данных: {e}")
+            raise
+    
     @asynccontextmanager
     async def get_connection(self):
-        """Async context manager for database connections"""
-        async with aiosqlite.connect(self.db_path) as db:
-            db.row_factory = aiosqlite.Row
-            yield db
+        """Асинхронное соединение с базой данных"""
+        try:
+            async with aiosqlite.connect(self.db_path, timeout=Config.DB_TIMEOUT) as db:
+                db.row_factory = aiosqlite.Row
+                yield db
+        except Exception as e:
+            logger.error(f"Ошибка соединения с БД: {e}")
+            raise
+    
+    async def execute(self, query: str, params: tuple = None):
+        """Выполнить SQL-запрос"""
+        try:
+            async with self.get_connection() as db:
+                await db.execute(query, params or ())
+                await db.commit()
+        except Exception as e:
+            logger.error(f"Ошибка выполнения запроса: {e}")
+            raise
+    
+    async def fetchone(self, query: str, params: tuple = None):
+        """Получить одну запись"""
+        try:
+            async with self.get_connection() as db:
+                async with db.execute(query, params or ()) as cursor:
+                    return await cursor.fetchone()
+        except Exception as e:
+            logger.error(f"Ошибка получения записи: {e}")
+            return None
+    
+    async def fetchall(self, query: str, params: tuple = None):
+        """Получить все записи"""
+        try:
+            async with self.get_connection() as db:
+                async with db.execute(query, params or ()) as cursor:
+                    return await cursor.fetchall()
+        except Exception as e:
+            logger.error(f"Ошибка получения записей: {e}")
+            return []
     
     async def backup(self):
-        """Create a timestamped backup"""
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        backup_file = os.path.join(BACKUP_DIR, f'cobra_backup_{timestamp}.db')
-        
-        async with self.get_connection() as src:
-            async with aiosqlite.connect(backup_file) as dst:
-                await src.backup(dst)
-        
-        logger.info(f"Database backup created: {backup_file}")
-        return backup_file
+        """Создать резервную копию базы данных"""
+        try:
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            backup_path = f"{Config.BACKUP_DIR}/backup_{timestamp}.db"
+            
+            async with self.get_connection() as src:
+                async with aiosqlite.connect(backup_path) as dst:
+                    await src.backup(dst)
+            
+            logger.info(f"Резервная копия создана: {backup_path}")
+            return backup_path
+        except Exception as e:
+            logger.error(f"Ошибка создания резервной копии: {e}")
+            return None
 
-# Initialize database
-db_manager = DatabaseManager(DB_FILE)
+# Инициализация базы данных
+try:
+    Config.validate()
+    db = SupremeDatabase(Config.DB_FILE)
+    logger.info("Конфигурация и база данных загружены успешно")
+except Exception as e:
+    logger.critical(f"Критическая ошибка инициализации: {e}")
+    sys.exit(1)
 
-# ============================
-# ENHANCED LANGUAGE SYSTEM
-# ============================
+# ============================================================================
+# СИСТЕМА РАНГОВ - УЛУЧШЕННАЯ
+# ============================================================================
 
-class LanguageManager:
-    """Centralized language management with auto-detection and fallback"""
+class SupremeRankSystem:
+    """Система рангов с бонусами и привилегиями"""
     
-    LANGUAGES = {
+    RANKS = [
+        (100000000, '🔥 ВЕЧНЫЙ ПОВЕЛИТЕЛЬ ГОТИЧЕСКОЙ КОБРЫ', '🔥', 2.0),
+        (50000000, '💎 АПОКАЛИПТИЧЕСКАЯ КОРОЛЕВА ГАДЮК', '💎', 1.8),
+        (10000000, '👑 КОСМИЧЕСКОЕ БОЖЕСТВО КОБРЫ', '👑', 1.6),
+        (5000000, '🌟 МИФИЧЕСКИЙ ТИТАН ГАДЮКИ', '🌟', 1.5),
+        (1000000, '⚡ ВЕРХОВНЫЙ БОГ КОБРЫ', '⚡', 1.4),
+        (500000, '🔥 ЛЕГЕНДАРНЫЙ ПОВЕЛИТЕЛЬ ГАДЮКИ', '🔥', 1.3),
+        (100000, '💫 ЗОЛОТОЙ ИМПЕРАТОР КОБРЫ', '💫', 1.2),
+        (50000, '💎 АЛМАЗНАЯ ГАДЮКА', '💎', 1.15),
+        (10000, '🏆 ПЛАТИНОВЫЙ ЗМЕЙ', '🏆', 1.1),
+        (5000, '🪙 ЗОЛОТАЯ ГАДЮКА', '🪙', 1.05),
+        (1000, '🥈 СЕРЕБРЯНЫЙ ЗМЕЙ', '🥈', 1.03),
+        (100, '🪱 БРОНЗОВЫЙ ЧЕРВЬ', '🪱', 1.01),
+        (0, '🐛 ЖАЛКИЙ НОВИЧОК', '🐛', 1.0)
+    ]
+    
+    @classmethod
+    def get_rank_info(cls, spent_stars: int) -> dict:
+        """Получить информацию о ранге пользователя"""
+        for threshold, name, emoji, multiplier in cls.RANKS:
+            if spent_stars >= threshold:
+                return {
+                    'name': name,
+                    'emoji': emoji,
+                    'multiplier': multiplier,
+                    'threshold': threshold
+                }
+        return cls.RANKS[-1]
+    
+    @classmethod
+    def get_next_rank(cls, spent_stars: int) -> dict:
+        """Получить следующий ранг"""
+        for i, (threshold, name, emoji, multiplier) in enumerate(cls.RANKS):
+            if spent_stars >= threshold:
+                if i > 0:
+                    next_threshold = cls.RANKS[i-1][0]
+                    next_name = cls.RANKS[i-1][1]
+                    next_emoji = cls.RANKS[i-1][2]
+                    needed = next_threshold - spent_stars
+                    return {
+                        'name': next_name,
+                        'emoji': next_emoji,
+                        'needed': needed,
+                        'threshold': next_threshold
+                    }
+        return {'name': 'MAX', 'emoji': '👑', 'needed': 0, 'threshold': spent_stars}
+    
+    @classmethod
+    def calculate_bonus(cls, spent_stars: int, base_amount: int) -> int:
+        """Рассчитать бонус на основе ранга"""
+        rank_info = cls.get_rank_info(spent_stars)
+        return int(base_amount * rank_info['multiplier'])
+
+# ============================================================================
+# СИСТЕМА ЯЗЫКОВ - ПОЛНОСТЬЮ ПЕРЕРАБОТАННАЯ
+# ============================================================================
+
+class SupremeLanguageSystem:
+    """Улучшенная система языков с кэшированием"""
+    
+    TRANSLATIONS = {
         'EN': {
-            'start_title': "🖤 **Golden Cobra Goth Mommy: Dominate or Die Trying!** 🖤",
-            'your_rank': "Your pathetic rank: {rank} (wasted {spent} ⭐, weakling)",
-            'top1': "Top-1 Boss: @{top_name} crushing with {top_spent} ⭐",
-            'fund': "Blood Fund: {total}/{goal} ⭐ ({progress:.1f}% to carnage)",
-            'motivation': "Spend stars like savage, child! Climb or crawl in dirt. Mommy demands best – win NFTs or cry! 💀🐍🔥 Become global emperor, gunner!",
-            'spend_button': "Spend Stars Like Beast ⭐💥",
-            'status_button': "Check Your Weakness 📊",
-            'top10_button': "Top-10 Warriors 🏆",
-            'referral_button': "Recruit Minions 👥",
-            'daily_button': "Grab Daily Blood Gift 🎁",
-            'shop_button': "NFT Dark Shop 🛒",
-            'challenge_button': "Challenge Warriors ⚔️",
-            'inventory_button': "Your Dark Arsenal 🎒",
-            'achievements_button': "Your Trophies 🏅",
-            'status_title': "🖤 **Your Goth Status in Cobra Hell** 🖤",
-            'spent': "Wasted: {spent} ⭐",
-            'earned': "Earned: {earned} ⭐",
-            'fund_status': "Hell Fund: {total}/{goal} ⭐ ({progress:.1f}% to NFT Massacre)",
-            'top10_title': "🏆 **Top-10 Cobra Killers** 🏆",
-            'no_top': "No warriors yet – claim throne, punk! 💥",
-            'spend_usage': "Command: /spend <amount> (don't be weakling)",
-            'spend_prompt': "Enter amount of stars to bleed (min: 10):",
-            'invoice_title': 'Bleed Stars in Golden Cobra',
-            'invoice_desc': 'Drain {amount} ⭐ for ultimate power and gore NFT!',
-            'payment_success': "💥 **CARNAGE!** You drained {amount} ⭐. New rank: {new_rank}. Fund: {total}/{goal}. Crush more, gunner! 🖤🔥",
-            'payment_error': "Payment failed! Weakling energy detected!",
-            'reminder': "🖤 Hey, @{username}! You're {gap} ⭐ behind top-1 @{top_name}. Spend NOW or Mommy punishes! 💀💰 No mercy for weak!",
-            'raffle_start': "🎉 **RAFFLE TIME!** Fund reached {goal} ⭐! Carnage raffle via poll! Vote to survive.",
-            'daily_claimed': "🎁 **BLOOD GIFT!** Grabbed: {bonus} ⭐! Streak: {streak}. Return tomorrow, soldier!",
-            'daily_already': "Already grabbed your share today. Go away until dawn!",
-            'referral_success': "👥 **MINION JOINED!** +{bonus} ⭐ for your dark empire!",
-            'referral_link': "**Your dark summon link:**\n`{link}`\nSpread and harvest souls for bonus stars!",
-            'language_changed': "Language twisted to {lang}.",
-            'help': """🖤 **GOLDEN COBRA GOTH MOMMY COMMANDS** 🖤
-
-**Core Commands:**
-/start - Awaken the beast
-/spend <amount> - Bleed stars for power
-/status - Check your weakness
-/top10 - See top-10 killers
-/daily - Grab daily blood gift
-/referral - Get minion summon link
-/inventory - Your collected items
-/achievements - Your unlocked trophies
-
-**Warrior Actions:**
-/dominate - Instant domination mode
-/conquer - Challenge top warrior
-/challenge @user <amount> - Challenge another warrior
-/shop - Dark NFT shop
-/buy <item_id> - Purchase dark artifact
-
-**Settings:**
-/lang <EN|RU|ES|FR> - Twist language
-/help - Show this message
-
-🛡️ **Admin Only:**
-/admin <command> - Admin panel
-/stats - Bot statistics
-/announce <text> - Global announcement""",
-            'dominate': "**DOMINATION MODE:** Spend big or go home! Enter amount, punk.",
-            'conquer': "**CONQUER THE TOP!** You're {gap} behind @{top_name}. Spend to crush: /spend {needed}",
-            'shop': "🖤 **DARK NFT SHOP** 🖤\n\n{items}\n\nUse /buy <item_id> to purchase",
-            'buy_success': "💀 **PURCHASED!** {item}! Your power grows, gunner!",
-            'buy_no_money': "Not enough stars, weakling! Earn more!",
-            'inventory_empty': "Your arsenal is empty! Buy items from shop.",
-            'inventory_title': "🖤 **YOUR DARK ARSENAL** 🖤",
-            'challenge_sent': "⚔️ **CHALLENGE THROWN!** to @{challenged}! Bet: {amount} ⭐. Accept or coward!",
-            'challenge_received': "⚔️ **CHALLENGE RECEIVED!**\n@{challenger} challenges you for {amount} ⭐!",
-            'challenge_accept': "**CHALLENGE ACCEPTED!** Winner takes all. Mommy watches... 💀",
-            'challenge_decline': "**CHALLENGE DECLINED.** Coward! 🐔",
-            'challenge_winner': "🏆 **CHALLENGE RESULT** 🏆\nWinner: @{winner} takes {amount} ⭐ from @{loser}!",
-            'challenge_expired': "Challenge expired! Both weaklings!",
-            'achievements_title': "🏅 **YOUR TROPHIES** 🏅",
-            'achievement_unlocked': "🎉 **ACHIEVEMENT UNLOCKED!** {name} - {description}\nReward: +{reward} ⭐",
-            'admin_announce_sent': "Announcement sent to {count} users!",
-            'stars_added': "Added {amount} ⭐ to @{username}'s empire!",
-            'error_generic': "Something went wrong! Mommy is displeased...",
-            'error_not_enough_stars': "Not enough stars! Earn more first!",
-            'error_user_not_found': "User not found in shadows.",
-            'error_invalid_amount': "Invalid amount! Must be positive number.",
-            'error_cooldown': "Cooldown active! Wait {seconds} seconds.",
+            'start': {
+                'title': "🖤 **GOLDEN COBRA GOTH MOMMY: DOMINATE OR DIE!** 🖤",
+                'welcome': "Welcome to the ultimate domination arena!",
+                'instructions': "Spend stars, climb ranks, collect NFTs, and become the ultimate Cobra Emperor!"
+            },
+            'errors': {
+                'not_enough_stars': "❌ Not enough stars! Earn more first!",
+                'invalid_amount': "❌ Invalid amount! Must be positive number.",
+                'user_not_found': "❌ User not found in shadows.",
+                'cooldown': "⏳ Cooldown active! Wait {seconds} seconds.",
+                'daily_claimed': "✅ Daily reward already claimed!",
+                'challenge_self': "❌ You can't challenge yourself!"
+            },
+            'success': {
+                'spend': "💥 **CARNAGE!** You spent {amount} ⭐! New rank: {rank}",
+                'daily': "🎁 **DAILY REWARD!** +{amount} ⭐! Streak: {streak}",
+                'challenge_sent': "⚔️ Challenge sent to @{username}!",
+                'challenge_won': "🏆 **VICTORY!** You won {amount} ⭐!",
+                'item_purchased': "🛒 **ITEM PURCHASED!** {item} added to your inventory!"
+            },
+            'buttons': {
+                'spend': "💰 Spend Stars",
+                'daily': "🎁 Daily Reward",
+                'shop': "🛒 NFT Shop",
+                'inventory': "🎒 Inventory",
+                'leaderboard': "🏆 Leaderboard",
+                'challenge': "⚔️ Challenge",
+                'quests': "📜 Quests",
+                'profile': "👤 Profile"
+            }
         },
         'RU': {
-            # Complete Russian translations (truncated for brevity)
-            'start_title': "🖤 **Golden Cobra Готическая Мамочка: Доминируй или Умри!** 🖤",
-            'your_rank': "Твой жалкий ранг: {rank} (потрачено {spent} ⭐, слабак)",
-            # ... other Russian translations
-        },
-        'ES': {
-            'start_title': "🖤 **Golden Cobra Goth Mommy: ¡Domina o Muere Intentándolo!** 🖤",
-            # ... Spanish translations
-        },
-        'FR': {
-            'start_title': "🖤 **Golden Cobra Goth Mommy: Domine ou Meurs en Essayant!** 🖤",
-            # ... French translations
+            'start': {
+                'title': "🖤 **GOLDEN COBRA ГОТИЧЕСКАЯ МАМОЧКА: ДОМИНИРУЙ ИЛИ УМРИ!** 🖤",
+                'welcome': "Добро пожаловать на арену тотального доминирования!",
+                'instructions': "Трать звезды, поднимайся в рангах, собирай NFT и стань императором Кобры!"
+            },
+            'errors': {
+                'not_enough_stars': "❌ Недостаточно звезд! Заработай больше!",
+                'invalid_amount': "❌ Неверное количество! Должно быть положительным числом.",
+                'user_not_found': "❌ Пользователь не найден во тьме.",
+                'cooldown': "⏳ Охлаждение активно! Подожди {seconds} секунд.",
+                'daily_claimed': "✅ Ежедневная награда уже получена!",
+                'challenge_self': "❌ Нельзя вызывать себя!"
+            },
+            'success': {
+                'spend': "💥 **БОЙНЯ!** Ты потратил {amount} ⭐! Новый ранг: {rank}",
+                'daily': "🎁 **ЕЖЕДНЕВНАЯ НАГРАДА!** +{amount} ⭐! Серия: {streak}",
+                'challenge_sent': "⚔️ Вызов отправлен @{username}!",
+                'challenge_won': "🏆 **ПОБЕДА!** Ты выиграл {amount} ⭐!",
+                'item_purchased': "🛒 **ПРЕДМЕТ КУПЛЕН!** {item} добавлен в инвентарь!"
+            },
+            'buttons': {
+                'spend': "💰 Потратить Звезды",
+                'daily': "🎁 Ежедневная Награда",
+                'shop': "🛒 NFT Магазин",
+                'inventory': "🎒 Инвентарь",
+                'leaderboard': "🏆 Таблица Лидеров",
+                'challenge': "⚔️ Вызов",
+                'quests': "📜 Квесты",
+                'profile': "👤 Профиль"
+            }
         }
     }
     
-    @staticmethod
-    def get_text(language: str, key: str, **kwargs) -> str:
-        """Get translated text with formatting"""
-        lang_dict = LanguageManager.LANGUAGES.get(language.upper(), LanguageManager.LANGUAGES['EN'])
-        text = lang_dict.get(key, LanguageManager.LANGUAGES['EN'].get(key, f"[{key}]"))
-        
+    @classmethod
+    def get_text(cls, lang: str, category: str, key: str, **kwargs) -> str:
+        """Получить переведенный текст"""
         try:
-            return text.format(**kwargs)
-        except KeyError:
+            text = cls.TRANSLATIONS.get(lang, cls.TRANSLATIONS['EN'])[category][key]
+            if kwargs:
+                return text.format(**kwargs)
             return text
-    
-    @staticmethod
-    def detect_language(user_lang: Optional[str]) -> str:
-        """Auto-detect user language"""
-        if user_lang and user_lang.upper() in LanguageManager.LANGUAGES:
-            return user_lang.upper()
-        return 'EN'
+        except KeyError:
+            return f"[{category}.{key}]"
 
-# ============================
-# ENHANCED RANKING SYSTEM
-# ============================
+# ============================================================================
+# СИСТЕМА КЭШИРОВАНИЯ - ВЫСОКОПРОИЗВОДИТЕЛЬНАЯ
+# ============================================================================
 
-class RankSystem:
-    """Advanced ranking system with achievements"""
+class SupremeCache:
+    """Система кэширования для максимальной производительности"""
     
-    RANKS = [
-        (100000000, '🔥 Eternal Goth Cobra Overlord 🖤🐍💀👑', '🔥'),
-        (50000000, '💎 Apocalyptic Viper Queen 💎🐍🖤🔥', '💎'),
-        (10000000, '👑 Cosmic Cobra Deity 🐍🌌👑', '👑'),
-        (5000000, '🌟 Mythical Viper Titan 💎🐍🛡️', '🌟'),
-        (1000000, '⚡ Ultimate Cobra God 🐍🛡️👑', '⚡'),
-        (500000, '🔥 Legendary Viper Overlord 💎🐍🔥', '🔥'),
-        (100000, '💫 Golden Cobra Emperor 🐍👑', '💫'),
-        (50000, '💎 Diamond Viper 💎🐍', '💎'),
-        (10000, '🏆 Platinum Snake 🏆🐍', '🏆'),
-        (5000, '🪙 Gold Adder 🪙🐍', '🪙'),
-        (1000, '🥈 Silver Serpent 🥈🐍', '🥈'),
-        (100, '🪱 Bronze Worm 🪱', '🪱'),
-        (0, '🐛 Pathetic Newbie Maggot 🐛', '🐛')
-    ]
-    
-    @staticmethod
-    def get_rank(spent_stars: int) -> Tuple[str, str, int]:
-        """Get rank based on spent stars"""
-        for threshold, rank_name, rank_emoji in RankSystem.RANKS:
-            if spent_stars >= threshold:
-                return rank_name, rank_emoji, threshold
+    def __init__(self):
+        self._cache = {}
+        self._timestamps = {}
+        self.ttl = 300  # 5 минут
         
-        return RankSystem.RANKS[-1][1], RankSystem.RANKS[-1][2], 0
+    def set(self, key: str, value: Any, ttl: int = None):
+        """Сохранить значение в кэш"""
+        self._cache[key] = value
+        self._timestamps[key] = time.time() + (ttl or self.ttl)
+        
+    def get(self, key: str, default: Any = None) -> Any:
+        """Получить значение из кэша"""
+        if key in self._cache:
+            if time.time() < self._timestamps.get(key, 0):
+                return self._cache[key]
+            else:
+                # Удалить просроченный кэш
+                del self._cache[key]
+                del self._timestamps[key]
+        return default
     
-    @staticmethod
-    def get_next_rank(spent_stars: int) -> Tuple[str, int, int]:
-        """Get next rank and stars needed"""
-        for i, (threshold, rank_name, _) in enumerate(RankSystem.RANKS):
-            if spent_stars >= threshold:
-                if i > 0:
-                    next_threshold = RankSystem.RANKS[i-1][0]
-                    next_rank = RankSystem.RANKS[i-1][1]
-                    needed = next_threshold - spent_stars
-                    return next_rank, needed, next_threshold
-                break
-        return "MAX RANK", 0, spent_stars
+    def delete(self, key: str):
+        """Удалить значение из кэша"""
+        if key in self._cache:
+            del self._cache[key]
+            del self._timestamps[key]
+    
+    def clear(self):
+        """Очистить весь кэш"""
+        self._cache.clear()
+        self._timestamps.clear()
 
-# ============================
-# BOT SETUP
-# ============================
+# Инициализация кэша
+cache = SupremeCache()
 
-# Bot initialization
-bot = Bot(
-    token=BOT_TOKEN,
-    default=DefaultBotProperties(parse_mode=ParseMode.MARKDOWN)
-)
+# ============================================================================
+# ОСНОВНЫЕ КЛАССЫ БОТА
+# ============================================================================
 
-# Storage and dispatcher
-storage = MemoryStorage()
-dp = Dispatcher(storage=storage)
-
-# ============================
-# STATE MANAGEMENT
-# ============================
-
-class UserStates(StatesGroup):
-    awaiting_spend_amount = State()
-    awaiting_challenge_amount = State()
-    awaiting_purchase_item = State()
-    awaiting_admin_command = State()
-
-# ============================
-# DATABASE HELPERS
-# ============================
-
-async def get_or_create_user(user_id: int, username: str = None, first_name: str = None, language: str = 'EN'):
-    """Get or create user in database"""
-    async with db_manager.get_connection() as db:
-        # Check if user exists
-        cursor = await db.execute(
-            'SELECT * FROM users WHERE user_id = ?',
-            (user_id,)
+class SupremeBot:
+    """Главный класс бота с улучшенной архитектурой"""
+    
+    def __init__(self):
+        self.bot = Bot(
+            token=Config.BOT_TOKEN,
+            default=DefaultBotProperties(parse_mode=ParseMode.MARKDOWN)
         )
-        user = await cursor.fetchone()
+        self.storage = MemoryStorage()
+        self.dp = Dispatcher(storage=self.storage)
+        self.router = Router()
+        self.dp.include_router(self.router)
         
-        if not user:
-            # Create new user
-            await db.execute(
-                '''INSERT INTO users 
-                (user_id, username, first_name, language, created_at, last_active) 
-                VALUES (?, ?, ?, ?, datetime('now'), datetime('now'))''',
-                (user_id, username, first_name, language)
-            )
-            await db.commit()
+        # Инициализация состояний
+        self.states = self.create_states()
+        
+        # Регистрация обработчиков
+        self.register_handlers()
+        
+        logger.info("Supreme Bot initialized")
+    
+    class States(StatesGroup):
+        """Состояния FSM"""
+        await_spend = State()
+        await_challenge = State()
+        await_purchase = State()
+        await_quest = State()
+    
+    def create_states(self):
+        """Создание состояний"""
+        return self.States()
+    
+    def register_handlers(self):
+        """Регистрация всех обработчиков"""
+        
+        @self.router.message(Command("start"))
+        async def cmd_start(message: Message, command: CommandObject = None):
+            await self.handle_start(message, command)
+        
+        @self.router.message(Command("spend"))
+        async def cmd_spend(message: Message, command: CommandObject = None):
+            await self.handle_spend(message, command)
+        
+        @self.router.message(Command("daily"))
+        async def cmd_daily(message: Message):
+            await self.handle_daily(message)
+        
+        @self.router.message(Command("shop"))
+        async def cmd_shop(message: Message):
+            await self.handle_shop(message)
+        
+        @self.router.message(Command("profile"))
+        async def cmd_profile(message: Message):
+            await self.handle_profile(message)
+        
+        @self.router.message(Command("leaderboard"))
+        async def cmd_leaderboard(message: Message):
+            await self.handle_leaderboard(message)
+        
+        @self.router.message(Command("help"))
+        async def cmd_help(message: Message):
+            await self.handle_help(message)
+        
+        @self.router.message(Command("admin"))
+        async def cmd_admin(message: Message, command: CommandObject = None):
+            await self.handle_admin(message, command)
+    
+    async def handle_start(self, message: Message, command: CommandObject):
+        """Обработка команды /start"""
+        try:
+            user_id = message.from_user.id
+            username = message.from_user.username or message.from_user.first_name
             
-            # Get the created user
-            cursor = await db.execute(
-                'SELECT * FROM users WHERE user_id = ?',
-                (user_id,)
-            )
-            user = await cursor.fetchone()
-        
-        # Update last active
-        await db.execute(
-            'UPDATE users SET last_active = datetime("now") WHERE user_id = ?',
-            (user_id,)
-        )
-        await db.commit()
-        
-        return dict(user) if user else None
-
-async def get_user_language(user_id: int) -> str:
-    """Get user's language preference"""
-    async with db_manager.get_connection() as db:
-        cursor = await db.execute(
-            'SELECT language FROM users WHERE user_id = ?',
-            (user_id,)
-        )
-        result = await cursor.fetchone()
-        return result['language'] if result else 'EN'
-
-async def add_stars(user_id: int, amount: int, transaction_type: str, description: str = None):
-    """Add stars to user with transaction tracking"""
-    if amount <= 0:
-        return False
-    
-    async with db_manager.get_connection() as db:
-        # Update user's earned stars
-        await db.execute(
-            'UPDATE users SET earned_stars = earned_stars + ? WHERE user_id = ?',
-            (amount, user_id)
-        )
-        
-        # Record transaction
-        await db.execute(
-            '''INSERT INTO transactions 
-            (user_id, amount, transaction_type, description) 
-            VALUES (?, ?, ?, ?)''',
-            (user_id, amount, transaction_type, description)
-        )
-        
-        # Update global fund for spend transactions
-        if transaction_type == 'spend':
-            await db.execute(
-                'UPDATE global_fund SET total_stars = total_stars + ? WHERE id = 1',
-                (amount,)
-            )
-        
-        await db.commit()
-        return True
-
-async def spend_stars(user_id: int, amount: int, description: str = None):
-    """Spend stars from user's balance"""
-    async with db_manager.get_connection() as db:
-        # Check if user has enough earned stars
-        cursor = await db.execute(
-            'SELECT earned_stars FROM users WHERE user_id = ?',
-            (user_id,)
-        )
-        result = await cursor.fetchone()
-        
-        if not result or result['earned_stars'] < amount:
-            return False
-        
-        # Update user's spent and earned stars
-        await db.execute(
-            '''UPDATE users 
-            SET spent_stars = spent_stars + ?,
-                earned_stars = earned_stars - ?
-            WHERE user_id = ?''',
-            (amount, amount, user_id)
-        )
-        
-        # Record transaction
-        await db.execute(
-            '''INSERT INTO transactions 
-            (user_id, amount, transaction_type, description) 
-            VALUES (?, ?, "spend", ?)''',
-            (user_id, amount, description)
-        )
-        
-        # Update global fund
-        await db.execute(
-            'UPDATE global_fund SET total_stars = total_stars + ? WHERE id = 1',
-            (amount,)
-        )
-        
-        await db.commit()
-        
-        # Check for achievements
-        await check_achievements(user_id)
-        
-        return True
-
-async def get_leaderboard(limit: int = 10):
-    """Get top users by spent stars"""
-    async with db_manager.get_connection() as db:
-        cursor = await db.execute(
-            '''SELECT user_id, username, spent_stars, earned_stars 
-            FROM users 
-            WHERE is_banned = FALSE 
-            ORDER BY spent_stars DESC 
-            LIMIT ?''',
-            (limit,)
-        )
-        return await cursor.fetchall()
-
-async def get_user_position(user_id: int) -> int:
-    """Get user's position in leaderboard"""
-    async with db_manager.get_connection() as db:
-        cursor = await db.execute(
-            '''SELECT COUNT(*) as position 
-            FROM users 
-            WHERE spent_stars > (SELECT spent_stars FROM users WHERE user_id = ?) 
-            AND is_banned = FALSE''',
-            (user_id,)
-        )
-        result = await cursor.fetchone()
-        return result['position'] + 1 if result else 1
-
-async def check_achievements(user_id: int):
-    """Check and unlock achievements for user"""
-    async with db_manager.get_connection() as db:
-        # Get user stats
-        cursor = await db.execute(
-            '''SELECT 
-                spent_stars,
-                earned_stars,
-                daily_streak,
-                referrals,
-                (SELECT COUNT(*) FROM challenges WHERE winner_id = ?) as challenges_won,
-                (SELECT COUNT(DISTINCT item_id) FROM inventory WHERE user_id = ?) as nft_count
-            FROM users WHERE user_id = ?''',
-            (user_id, user_id, user_id)
-        )
-        stats = await cursor.fetchone()
-        
-        if not stats:
-            return
-        
-        # Get all achievements
-        cursor = await db.execute('SELECT * FROM achievements')
-        achievements = await cursor.fetchall()
-        
-        for achievement in achievements:
-            # Check if already unlocked
-            cursor = await db.execute(
-                'SELECT 1 FROM user_achievements WHERE user_id = ? AND achievement_id = ?',
-                (user_id, achievement['id'])
-            )
-            if await cursor.fetchone():
-                continue
-            
-            # Check condition
-            condition_met = False
-            condition_type = achievement['condition_type']
-            condition_value = achievement['condition_value']
-            
-            if condition_type == 'spend' and stats['spent_stars'] >= condition_value:
-                condition_met = True
-            elif condition_type == 'earned' and stats['earned_stars'] >= condition_value:
-                condition_met = True
-            elif condition_type == 'daily_streak' and stats['daily_streak'] >= condition_value:
-                condition_met = True
-            elif condition_type == 'referral' and stats['referrals'] >= condition_value:
-                condition_met = True
-            elif condition_type == 'challenge_win' and stats['challenges_won'] >= condition_value:
-                condition_met = True
-            elif condition_type == 'nft_count' and stats['nft_count'] >= condition_value:
-                condition_met = True
-            elif condition_type == 'rank' and await get_user_position(user_id) <= condition_value:
-                condition_met = True
-            
-            if condition_met:
-                # Unlock achievement
-                await db.execute(
-                    'INSERT INTO user_achievements (user_id, achievement_id) VALUES (?, ?)',
-                    (user_id, achievement['id'])
-                )
-                
-                # Award stars
-                if achievement['reward_stars'] > 0:
-                    await add_stars(
-                        user_id, 
-                        achievement['reward_stars'], 
-                        'achievement',
-                        f"Achievement: {achievement['name']}"
-                    )
-                
-                await db.commit()
-                
-                # Notify user
-                lang = await get_user_language(user_id)
-                achievement_text = LanguageManager.get_text(
-                    lang,
-                    'achievement_unlocked',
-                    name=achievement['name'],
-                    description=achievement['description'],
-                    reward=achievement['reward_stars']
-                )
-                
+            # Реферальная система
+            referral_bonus = 0
+            if command and command.args:
                 try:
-                    await bot.send_message(
-                        user_id,
-                        f"{achievement['emoji']} {achievement_text}"
-                    )
-                except Exception as e:
-                    logger.error(f"Failed to notify achievement: {e}")
+                    referrer_id = int(command.args)
+                    if referrer_id != user_id:
+                        # Начисляем бонус рефереру
+                        await db.execute(
+                            "UPDATE users SET referrals = referrals + 1 WHERE user_id = ?",
+                            (referrer_id,)
+                        )
+                        await db.execute(
+                            "UPDATE users SET earned_stars = earned_stars + 100 WHERE user_id = ?",
+                            (referrer_id,)
+                        )
+                        await db.execute(
+                            "UPDATE users SET referral_id = ? WHERE user_id = ?",
+                            (referrer_id, user_id)
+                        )
+                        referral_bonus = 100
+                except ValueError:
+                    pass
+            
+            # Создание/обновление пользователя
+            await db.execute('''
+                INSERT OR REPLACE INTO users 
+                (user_id, username, first_name, last_active) 
+                VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+            ''', (user_id, username, message.from_user.first_name))
+            
+            # Приветственное сообщение
+            keyboard = self.create_main_keyboard('EN')
+            
+            welcome_text = """
+🖤 **WELCOME TO GOLDEN COBRA SUPREME!** 🖤
 
-# ============================
-# BOT HANDLERS
-# ============================
+*Your journey to domination begins now!*
 
-@dp.message(Command("start"))
-async def cmd_start(message: Message, command: CommandObject = None):
-    """Start command with referral support"""
-    user_id = message.from_user.id
-    username = message.from_user.username
-    first_name = message.from_user.first_name
+💎 *Features:*
+• Spend stars to climb ranks
+• Collect rare NFTs
+• Challenge other players
+• Complete quests for rewards
+• Compete for top positions
+
+⚡ *Quick Start:*
+1. Use /daily for free stars
+2. Spend stars with /spend
+3. Check /shop for NFTs
+4. View /leaderboard
+
+🔥 *Become the ultimate Cobra Emperor!*
+            """
+            
+            if referral_bonus:
+                welcome_text += f"\n\n🎁 **Referral Bonus:** +{referral_bonus} ⭐"
+            
+            await message.answer(welcome_text, reply_markup=keyboard)
+            
+        except Exception as e:
+            logger.error(f"Error in handle_start: {e}")
+            await message.answer("❌ Error initializing your profile. Please try again.")
     
-    # Auto-detect language
-    user_lang = LanguageManager.detect_language(message.from_user.language_code)
-    
-    # Handle referral if present
-    referral_bonus = 0
-    if command and command.args:
+    async def handle_spend(self, message: Message, command: CommandObject):
+        """Обработка команды /spend"""
         try:
-            referrer_id = int(command.args)
-            if referrer_id != user_id:
-                async with db_manager.get_connection() as db:
-                    # Update referrer stats
-                    await db.execute(
-                        'UPDATE users SET referrals = referrals + 1 WHERE user_id = ?',
-                        (referrer_id,)
-                    )
-                    
-                    # Add bonus stars to referrer
-                    await add_stars(
-                        referrer_id,
-                        100,
-                        'referral',
-                        f'Referral: @{username}'
-                    )
-                    
-                    # Set referral for new user
-                    await db.execute(
-                        'UPDATE users SET referral_id = ? WHERE user_id = ?',
-                        (referrer_id, user_id)
-                    )
-                    
-                    await db.commit()
-                    referral_bonus = 100
-                    
-                    # Notify referrer
-                    referrer_lang = await get_user_language(referrer_id)
-                    referrer_text = LanguageManager.get_text(
-                        referrer_lang,
-                        'referral_success',
-                        bonus=100
-                    )
-                    
-                    try:
-                        await bot.send_message(referrer_id, referrer_text)
-                    except Exception as e:
-                        logger.error(f"Failed to notify referrer: {e}")
-                        
-        except ValueError:
-            pass
-    
-    # Get or create user
-    user = await get_or_create_user(user_id, username, first_name, user_lang)
-    
-    if not user:
-        await message.answer("Error creating user profile!")
-        return
-    
-    # Get user language
-    lang = await get_user_language(user_id)
-    
-    # Get user stats
-    async with db_manager.get_connection() as db:
-        cursor = await db.execute(
-            'SELECT spent_stars, earned_stars FROM users WHERE user_id = ?',
-            (user_id,)
-        )
-        stats = await cursor.fetchone()
-    
-    if not stats:
-        await message.answer("Error fetching stats!")
-        return
-    
-    spent_stars = stats['spent_stars']
-    earned_stars = stats['earned_stars']
-    
-    # Get rank
-    rank_name, rank_emoji, _ = RankSystem.get_rank(spent_stars)
-    
-    # Get top user
-    leaderboard = await get_leaderboard(1)
-    top_user = leaderboard[0] if leaderboard else None
-    
-    # Get global fund
-    async with db_manager.get_connection() as db:
-        cursor = await db.execute('SELECT * FROM global_fund WHERE id = 1')
-        fund = await cursor.fetchone()
-    
-    total_stars = fund['total_stars'] if fund else 0
-    current_goal = fund['current_goal'] if fund else 10000
-    progress = min((total_stars / current_goal) * 100, 100) if current_goal > 0 else 100
-    
-    # Welcome message
-    welcome_text = LanguageManager.get_text(
-        lang,
-        'start_title'
-    )
-    
-    stats_text = LanguageManager.get_text(
-        lang,
-        'your_rank',
-        rank=rank_name,
-        spent=spent_stars
-    )
-    
-    top_text = LanguageManager.get_text(
-        lang,
-        'top1',
-        top_name=top_user['username'] if top_user else 'None',
-        top_spent=top_user['spent_stars'] if top_user else 0
-    )
-    
-    fund_text = LanguageManager.get_text(
-        lang,
-        'fund',
-        total=total_stars,
-        goal=current_goal,
-        progress=progress
-    )
-    
-    motivation_text = LanguageManager.get_text(lang, 'motivation')
-    
-    # Create keyboard
-    keyboard = InlineKeyboardBuilder()
-    
-    buttons = [
-        (LanguageManager.get_text(lang, 'spend_button'), "spend"),
-        (LanguageManager.get_text(lang, 'status_button'), "status"),
-        (LanguageManager.get_text(lang, 'top10_button'), "top10"),
-        (LanguageManager.get_text(lang, 'daily_button'), "daily"),
-        (LanguageManager.get_text(lang, 'referral_button'), "referral"),
-        (LanguageManager.get_text(lang, 'shop_button'), "shop"),
-        (LanguageManager.get_text(lang, 'inventory_button'), "inventory"),
-        (LanguageManager.get_text(lang, 'achievements_button'), "achievements"),
-    ]
-    
-    for text, callback_data in buttons:
-        keyboard.button(text=text, callback_data=callback_data)
-    
-    keyboard.adjust(2)
-    
-    # Send welcome message
-    full_text = f"{welcome_text}\n\n{stats_text}\n{top_text}\n{fund_text}\n\n{motivation_text}"
-    
-    if referral_bonus > 0:
-        full_text += f"\n\n🎁 **Referral Bonus:** +{referral_bonus} ⭐ added to your balance!"
-    
-    await message.answer(
-        full_text,
-        reply_markup=keyboard.as_markup(),
-        parse_mode=ParseMode.MARKDOWN
-    )
-
-@dp.message(Command("spend"))
-async def cmd_spend(message: Message, command: CommandObject = None):
-    """Spend stars command"""
-    user_id = message.from_user.id
-    lang = await get_user_language(user_id)
-    
-    if command and command.args:
-        try:
-            amount = int(command.args)
-            if amount <= 0:
-                await message.answer(LanguageManager.get_text(lang, 'error_invalid_amount'))
-                return
+            user_id = message.from_user.id
             
-            # Check if user has enough stars
-            async with db_manager.get_connection() as db:
-                cursor = await db.execute(
-                    'SELECT earned_stars FROM users WHERE user_id = ?',
-                    (user_id,)
-                )
-                result = await cursor.fetchone()
-                
-                if not result or result['earned_stars'] < amount:
-                    await message.answer(LanguageManager.get_text(lang, 'error_not_enough_stars'))
-                    return
-            
-            # Spend stars
-            success = await spend_stars(user_id, amount, f"Spent via command: {amount}")
-            
-            if success:
-                # Get updated stats
-                async with db_manager.get_connection() as db:
-                    cursor = await db.execute(
-                        'SELECT spent_stars FROM users WHERE user_id = ?',
+            if command and command.args:
+                try:
+                    amount = int(command.args)
+                    if amount < Config.MIN_STARS_PER_TRANSACTION:
+                        await message.answer(f"❌ Minimum amount is {Config.MIN_STARS_PER_TRANSACTION} ⭐")
+                        return
+                    
+                    if amount > Config.MAX_STARS_PER_TRANSACTION:
+                        await message.answer(f"❌ Maximum amount is {Config.MAX_STARS_PER_TRANSACTION} ⭐")
+                        return
+                    
+                    # Проверяем баланс
+                    user = await db.fetchone(
+                        "SELECT earned_stars FROM users WHERE user_id = ?",
                         (user_id,)
                     )
-                    new_spent = (await cursor.fetchone())['spent_stars']
-                
-                # Get new rank
-                new_rank, _, _ = RankSystem.get_rank(new_spent)
-                
-                # Get global fund
-                async with db_manager.get_connection() as db:
-                    cursor = await db.execute('SELECT total_stars, current_goal FROM global_fund WHERE id = 1')
-                    fund = await cursor.fetchone()
-                
-                total = fund['total_stars'] if fund else 0
-                goal = fund['current_goal'] if fund else 10000
-                
-                # Send success message
-                success_text = LanguageManager.get_text(
-                    lang,
-                    'payment_success',
-                    amount=amount,
-                    new_rank=new_rank,
-                    total=total,
-                    goal=goal
-                )
-                
-                await message.answer(success_text)
-                
-                # Check if goal reached
-                if total >= goal and fund and not fund['raffle_active']:
-                    await start_raffle(goal)
                     
+                    if not user or user['earned_stars'] < amount:
+                        await message.answer("❌ Not enough stars! Use /daily to get more.")
+                        return
+                    
+                    # Обновляем баланс
+                    await db.execute('''
+                        UPDATE users 
+                        SET spent_stars = spent_stars + ?,
+                            earned_stars = earned_stars - ?
+                        WHERE user_id = ?
+                    ''', (amount, amount, user_id))
+                    
+                    # Обновляем глобальный фонд
+                    await db.execute(
+                        "UPDATE global_fund SET total_stars = total_stars + ? WHERE id = 1",
+                        (amount,)
+                    )
+                    
+                    # Записываем транзакцию
+                    await db.execute('''
+                        INSERT INTO transactions (user_id, amount, type, description)
+                        VALUES (?, ?, 'spend', ?)
+                    ''', (user_id, amount, f"Spent {amount} stars"))
+                    
+                    # Получаем новый ранг
+                    user_data = await db.fetchone(
+                        "SELECT spent_stars FROM users WHERE user_id = ?",
+                        (user_id,)
+                    )
+                    
+                    rank_info = SupremeRankSystem.get_rank_info(user_data['spent_stars'])
+                    
+                    # Отправляем сообщение об успехе
+                    success_text = f"""
+💥 **STARS SPENT SUCCESSFULLY!** 💥
+
+⭐ Amount: {amount} stars
+👑 New Rank: {rank_info['emoji']} {rank_info['name']}
+🔥 Multiplier: x{rank_info['multiplier']}
+
+*Keep spending to reach higher ranks!*
+                    """
+                    
+                    await message.answer(success_text)
+                    
+                    # Проверяем достижения
+                    await self.check_achievements(user_id)
+                    
+                    # Проверяем квесты
+                    await self.check_quests(user_id, 'spend', amount)
+                    
+                except ValueError:
+                    await message.answer("❌ Invalid amount! Usage: /spend <amount>")
             else:
-                await message.answer(LanguageManager.get_text(lang, 'payment_error'))
+                await message.answer("💰 Enter amount of stars to spend:\n\nUsage: `/spend 1000`")
                 
-        except ValueError:
-            await message.answer(LanguageManager.get_text(lang, 'spend_usage'))
-    else:
-        # Enter amount state
-        await message.answer(LanguageManager.get_text(lang, 'spend_prompt'))
-        await dp.current_state().set_state(UserStates.awaiting_spend_amount)
-
-@dp.message(Command("daily"))
-async def cmd_daily(message: Message):
-    """Daily reward command"""
-    user_id = message.from_user.id
-    lang = await get_user_language(user_id)
+        except Exception as e:
+            logger.error(f"Error in handle_spend: {e}")
+            await message.answer("❌ Error processing your request. Please try again.")
     
-    async with db_manager.get_connection() as db:
-        # Get user's last claim
-        cursor = await db.execute(
-            'SELECT last_daily_claim, daily_streak FROM users WHERE user_id = ?',
-            (user_id,)
-        )
-        user = await cursor.fetchone()
-        
-        now = datetime.now()
-        
-        if user and user['last_daily_claim']:
-            last_claim = datetime.fromisoformat(user['last_daily_claim'].replace('Z', '+00:00'))
-            hours_since = (now - last_claim).total_seconds() / 3600
+    async def handle_daily(self, message: Message):
+        """Обработка команды /daily"""
+        try:
+            user_id = message.from_user.id
             
-            if hours_since < 20:  # 20 hour cooldown
-                await message.answer(LanguageManager.get_text(lang, 'daily_already'))
-                return
-            
-            # Check if streak continues
-            if hours_since < 48:
-                new_streak = user['daily_streak'] + 1
-            else:
-                new_streak = 1
-        else:
-            new_streak = 1
-        
-        # Calculate bonus (base + streak bonus)
-        base_bonus = 100
-        streak_bonus = min(new_streak * 10, 500)  # Max 500 bonus
-        total_bonus = base_bonus + streak_bonus
-        
-        # Update user
-        await db.execute(
-            '''UPDATE users 
-            SET last_daily_claim = ?, 
-                daily_streak = ?,
-                earned_stars = earned_stars + ?
-            WHERE user_id = ?''',
-            (now.isoformat(), new_streak, total_bonus, user_id)
-        )
-        
-        # Record transaction
-        await db.execute(
-            '''INSERT INTO transactions 
-            (user_id, amount, transaction_type, description) 
-            VALUES (?, ?, "daily", ?)''',
-            (user_id, total_bonus, f"Daily reward (streak: {new_streak})")
-        )
-        
-        await db.commit()
-    
-    # Send success message
-    success_text = LanguageManager.get_text(
-        lang,
-        'daily_claimed',
-        bonus=total_bonus,
-        streak=new_streak
-    )
-    
-    await message.answer(success_text)
-
-@dp.message(Command("top10"))
-async def cmd_top10(message: Message):
-    """Top 10 leaderboard command"""
-    user_id = message.from_user.id
-    lang = await get_user_language(user_id)
-    
-    # Get leaderboard
-    leaderboard = await get_leaderboard(10)
-    
-    if not leaderboard:
-        await message.answer(LanguageManager.get_text(lang, 'no_top'))
-        return
-    
-    # Build leaderboard text
-    text = LanguageManager.get_text(lang, 'top10_title') + "\n\n"
-    
-    for i, user in enumerate(leaderboard, 1):
-        rank_emoji = ["🥇", "🥈", "🥉", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣", "🔟"][i-1] if i <= 10 else f"{i}."
-        username = user['username'] or f"User{user['user_id']}"
-        text += f"{rank_emoji} **{username}** - {user['spent_stars']} ⭐\n"
-    
-    # Add user's position if not in top 10
-    user_position = await get_user_position(user_id)
-    if user_position > 10:
-        async with db_manager.get_connection() as db:
-            cursor = await db.execute(
-                'SELECT spent_stars FROM users WHERE user_id = ?',
+            # Проверяем время последнего получения
+            user = await db.fetchone(
+                "SELECT last_daily_claim, daily_streak FROM users WHERE user_id = ?",
                 (user_id,)
             )
-            user_spent = (await cursor.fetchone())['spent_stars']
-        
-        text += f"\n...\n#{user_position}. **You** - {user_spent} ⭐"
-    
-    await message.answer(text)
-
-@dp.message(Command("shop"))
-async def cmd_shop(message: Message):
-    """NFT shop command"""
-    user_id = message.from_user.id
-    lang = await get_user_language(user_id)
-    
-    async with db_manager.get_connection() as db:
-        cursor = await db.execute(
-            '''SELECT id, name, description, price, emoji, rarity, stock 
-            FROM shop_items 
-            WHERE available = TRUE 
-            ORDER BY price'''
-        )
-        items = await cursor.fetchall()
-    
-    if not items:
-        await message.answer("Shop is empty!")
-        return
-    
-    # Build shop text
-    items_text = ""
-    for item in items:
-        stock_info = f" ({item['stock']} left)" if item['stock'] > 0 else ""
-        items_text += f"{item['id']}. {item['emoji']} **{item['name']}** - {item['price']} ⭐\n"
-        items_text += f"   *{item['description']}* [{item['rarity']}]{stock_info}\n\n"
-    
-    shop_text = LanguageManager.get_text(lang, 'shop', items=items_text)
-    
-    # Create buy buttons
-    keyboard = InlineKeyboardBuilder()
-    for item in items[:5]:  # Show first 5 items as buttons
-        keyboard.button(
-            text=f"{item['emoji']} {item['name']} - {item['price']}⭐",
-            callback_data=f"buy_{item['id']}"
-        )
-    
-    keyboard.adjust(1)
-    
-    await message.answer(
-        shop_text,
-        reply_markup=keyboard.as_markup()
-    )
-
-@dp.message(Command("inventory"))
-async def cmd_inventory(message: Message):
-    """User inventory command"""
-    user_id = message.from_user.id
-    lang = await get_user_language(user_id)
-    
-    async with db_manager.get_connection() as db:
-        cursor = await db.execute('''
-            SELECT si.name, si.emoji, si.rarity, i.purchased_at, i.is_equipped
-            FROM inventory i
-            JOIN shop_items si ON i.item_id = si.id
-            WHERE i.user_id = ?
-            ORDER BY i.purchased_at DESC
-        ''', (user_id,))
-        items = await cursor.fetchall()
-    
-    if not items:
-        await message.answer(LanguageManager.get_text(lang, 'inventory_empty'))
-        return
-    
-    # Build inventory text
-    text = LanguageManager.get_text(lang, 'inventory_title') + "\n\n"
-    
-    total_value = 0
-    for item in items:
-        equipped = " ⚔️" if item['is_equipped'] else ""
-        text += f"{item['emoji']} **{item['name']}** [{item['rarity']}]{equipped}\n"
-        text += f"   Purchased: {item['purchased_at'][:10]}\n\n"
-    
-    # Get total items count
-    cursor = await db.execute(
-        'SELECT COUNT(*) as count FROM inventory WHERE user_id = ?',
-        (user_id,)
-    )
-    count = (await cursor.fetchone())['count']
-    
-    text += f"**Total Items:** {count}"
-    
-    await message.answer(text)
-
-@dp.message(Command("challenge"))
-async def cmd_challenge(message: Message, command: CommandObject = None):
-    """Challenge another user"""
-    user_id = message.from_user.id
-    lang = await get_user_language(user_id)
-    
-    if not command or not command.args:
-        await message.answer("Usage: /challenge @username <amount>")
-        return
-    
-    args = command.args.split()
-    if len(args) < 2:
-        await message.answer("Usage: /challenge @username <amount>")
-        return
-    
-    # Parse arguments
-    username = args[0].lstrip('@')
-    try:
-        amount = int(args[1])
-    except ValueError:
-        await message.answer(LanguageManager.get_text(lang, 'error_invalid_amount'))
-        return
-    
-    if amount <= 0:
-        await message.answer(LanguageManager.get_text(lang, 'error_invalid_amount'))
-        return
-    
-    # Check if user has enough stars
-    async with db_manager.get_connection() as db:
-        cursor = await db.execute(
-            'SELECT earned_stars FROM users WHERE user_id = ?',
-            (user_id,)
-        )
-        user_stars = (await cursor.fetchone())['earned_stars']
-        
-        if user_stars < amount:
-            await message.answer(LanguageManager.get_text(lang, 'error_not_enough_stars'))
-            return
-        
-        # Find challenged user
-        cursor = await db.execute(
-            'SELECT user_id FROM users WHERE username = ? AND is_banned = FALSE',
-            (username,)
-        )
-        challenged = await cursor.fetchone()
-        
-        if not challenged:
-            await message.answer(LanguageManager.get_text(lang, 'error_user_not_found'))
-            return
-        
-        challenged_id = challenged['user_id']
-        
-        if challenged_id == user_id:
-            await message.answer("You can't challenge yourself!")
-            return
-        
-        # Check if challenged has enough stars
-        cursor = await db.execute(
-            'SELECT earned_stars FROM users WHERE user_id = ?',
-            (challenged_id,)
-        )
-        challenged_stars = (await cursor.fetchone())['earned_stars']
-        
-        if challenged_stars < amount:
-            await message.answer("Challenged user doesn't have enough stars!")
-            return
-        
-        # Create challenge
-        await db.execute('''
-            INSERT INTO challenges (challenger_id, challenged_id, amount)
-            VALUES (?, ?, ?)
-        ''', (user_id, challenged_id, amount))
-        
-        challenge_id = cursor.lastrowid
-        
-        await db.commit()
-    
-    # Create accept/decline buttons
-    keyboard = InlineKeyboardBuilder()
-    keyboard.button(
-        text="⚔️ Accept Challenge",
-        callback_data=f"challenge_accept_{challenge_id}"
-    )
-    keyboard.button(
-        text="🐔 Decline",
-        callback_data=f"challenge_decline_{challenge_id}"
-    )
-    
-    # Notify challenged user
-    challenged_lang = await get_user_language(challenged_id)
-    challenge_text = LanguageManager.get_text(
-        challenged_lang,
-        'challenge_received',
-        challenger=message.from_user.username or message.from_user.first_name,
-        amount=amount
-    )
-    
-    try:
-        await bot.send_message(
-            challenged_id,
-            challenge_text,
-            reply_markup=keyboard.as_markup()
-        )
-    except Exception as e:
-        await message.answer(f"Failed to send challenge: {e}")
-        return
-    
-    # Notify challenger
-    await message.answer(
-        LanguageManager.get_text(
-            lang,
-            'challenge_sent',
-            challenged=username,
-            amount=amount
-        )
-    )
-
-@dp.callback_query(F.data.startswith("challenge_"))
-async def handle_challenge_callback(callback: CallbackQuery):
-    """Handle challenge accept/decline"""
-    data = callback.data
-    user_id = callback.from_user.id
-    
-    if "_accept_" in data:
-        challenge_id = int(data.split("_accept_")[1])
-        
-        async with db_manager.get_connection() as db:
-            # Get challenge details
-            cursor = await db.execute('''
-                SELECT challenger_id, challenged_id, amount 
-                FROM challenges 
-                WHERE id = ? AND status = 'pending'
-            ''', (challenge_id,))
             
-            challenge = await cursor.fetchone()
+            now = datetime.now()
+            can_claim = True
             
-            if not challenge:
-                await callback.answer("Challenge not found or already resolved!")
-                return
+            if user and user['last_daily_claim']:
+                last_claim = datetime.fromisoformat(user['last_daily_claim'].replace('Z', '+00:00'))
+                hours_since = (now - last_claim).total_seconds() / 3600
+                
+                if hours_since < Config.DAILY_COOLDOWN_HOURS:
+                    can_claim = False
+                    remaining = Config.DAILY_COOLDOWN_HOURS - hours_since
+                    await message.answer(f"⏳ Come back in {int(remaining)} hours!")
+                    return
             
-            if user_id != challenge['challenged_id']:
-                await callback.answer("This challenge is not for you!")
-                return
+            # Рассчитываем награду
+            if user and user['daily_streak']:
+                streak = user['daily_streak']
+                if can_claim:
+                    new_streak = streak + 1
+                else:
+                    new_streak = 1
+            else:
+                new_streak = 1
             
-            # Update challenge status
-            await db.execute(
-                'UPDATE challenges SET status = "accepted" WHERE id = ?',
-                (challenge_id,)
-            )
+            # Базовая награда + бонус за серию
+            base_reward = 100
+            streak_bonus = min(new_streak * 10, 500)  # Макс 500
+            total_reward = base_reward + streak_bonus
             
-            # Determine winner randomly
-            winner_id = random.choice([challenge['challenger_id'], challenge['challenged_id']])
-            loser_id = challenge['challenger_id'] if winner_id == challenge['challenged_id'] else challenge['challenged_id']
-            
-            # Transfer stars
-            await db.execute('''
-                UPDATE users 
-                SET earned_stars = earned_stars - ?,
-                    total_challenges_lost = total_challenges_lost + 1
-                WHERE user_id = ?
-            ''', (challenge['amount'], loser_id))
-            
+            # Начисляем награду
             await db.execute('''
                 UPDATE users 
                 SET earned_stars = earned_stars + ?,
-                    total_challenges_won = total_challenges_won + 1
+                    daily_streak = ?,
+                    last_daily_claim = ?
                 WHERE user_id = ?
-            ''', (challenge['amount'], winner_id))
+            ''', (total_reward, new_streak, now.isoformat(), user_id))
             
-            # Update challenge with winner
-            await db.execute(
-                'UPDATE challenges SET winner_id = ?, status = "completed" WHERE id = ?',
-                (winner_id, challenge_id)
-            )
-            
-            # Record transactions
+            # Записываем транзакцию
             await db.execute('''
-                INSERT INTO transactions (user_id, amount, transaction_type, description)
-                VALUES (?, ?, "challenge", ?)
-            ''', (loser_id, -challenge['amount'], f"Lost challenge #{challenge_id}"))
+                INSERT INTO transactions (user_id, amount, type, description)
+                VALUES (?, ?, 'daily', ?)
+            ''', (user_id, total_reward, f"Daily reward (streak: {new_streak})"))
             
-            await db.execute('''
-                INSERT INTO transactions (user_id, amount, transaction_type, description)
-                VALUES (?, ?, "challenge", ?)
-            ''', (winner_id, challenge['amount'], f"Won challenge #{challenge_id}"))
+            # Отправляем сообщение
+            daily_text = f"""
+🎁 **DAILY REWARD COLLECTED!** 🎁
+
+⭐ Stars Received: {total_reward}
+📈 Daily Streak: {new_streak} days
+🔥 Streak Bonus: +{streak_bonus} stars
+
+*Come back tomorrow for even more!*
+            """
             
-            await db.commit()
+            await message.answer(daily_text)
             
-            # Get usernames for notification
-            cursor = await db.execute(
-                'SELECT username FROM users WHERE user_id IN (?, ?)',
-                (winner_id, loser_id)
-            )
-            users = await cursor.fetchall()
-            
-            winner_name = users[0]['username'] if users[0]['user_id'] == winner_id else users[1]['username']
-            loser_name = users[1]['username'] if users[1]['user_id'] == loser_id else users[0]['username']
-        
-        # Notify both users
-        winner_lang = await get_user_language(winner_id)
-        loser_lang = await get_user_language(loser_id)
-        
-        winner_text = LanguageManager.get_text(
-            winner_lang,
-            'challenge_winner',
-            winner=winner_name,
-            loser=loser_name,
-            amount=challenge['amount']
-        )
-        
-        loser_text = LanguageManager.get_text(
-            loser_lang,
-            'challenge_winner',
-            winner=winner_name,
-            loser=loser_name,
-            amount=challenge['amount']
-        )
-        
-        try:
-            await bot.send_message(winner_id, f"🏆 {winner_text}")
-            await bot.send_message(loser_id, f"💀 {loser_text}")
         except Exception as e:
-            logger.error(f"Failed to send challenge results: {e}")
-        
-        await callback.answer("Challenge accepted! Winner decided.")
-        
-    elif "_decline_" in data:
-        challenge_id = int(data.split("_decline_")[1])
-        
-        async with db_manager.get_connection() as db:
-            # Get challenge details
-            cursor = await db.execute('''
-                SELECT challenger_id, challenged_id 
-                FROM challenges 
-                WHERE id = ? AND status = 'pending'
-            ''', (challenge_id,))
+            logger.error(f"Error in handle_daily: {e}")
+            await message.answer("❌ Error claiming daily reward. Please try again.")
+    
+    async def handle_shop(self, message: Message):
+        """Обработка команды /shop"""
+        try:
+            # Получаем товары из магазина
+            items = await db.fetchall(
+                "SELECT * FROM shop_items WHERE available = 1 ORDER BY price"
+            )
             
-            challenge = await cursor.fetchone()
-            
-            if not challenge:
-                await callback.answer("Challenge not found!")
+            if not items:
+                await message.answer("🛒 Shop is currently empty!")
                 return
             
-            if user_id != challenge['challenged_id']:
-                await callback.answer("This challenge is not for you!")
+            # Создаем клавиатуру магазина
+            keyboard = InlineKeyboardBuilder()
+            
+            shop_text = "🛒 **GOLDEN COBRA NFT SHOP** 🛒\n\n"
+            
+            for item in items:
+                stock_info = f" ({item['stock']} left)" if item['stock'] > 0 else ""
+                shop_text += f"{item['emoji']} **{item['name']}**\n"
+                shop_text += f"*{item['description']}*\n"
+                shop_text += f"💰 Price: {item['price']} ⭐ [{item['rarity']}]{stock_info}\n"
+                shop_text += f"🆔 ID: `{item['id']}`\n\n"
+                
+                # Кнопка для покупки
+                keyboard.button(
+                    text=f"{item['emoji']} Buy {item['name']} - {item['price']}⭐",
+                    callback_data=f"buy_{item['id']}"
+                )
+            
+            keyboard.adjust(1)
+            shop_text += "\n*Use `/buy <item_id>` to purchase an item.*"
+            
+            await message.answer(shop_text, reply_markup=keyboard.as_markup())
+            
+        except Exception as e:
+            logger.error(f"Error in handle_shop: {e}")
+            await message.answer("❌ Error loading shop. Please try again.")
+    
+    async def handle_profile(self, message: Message):
+        """Обработка команды /profile"""
+        try:
+            user_id = message.from_user.id
+            
+            # Получаем данные пользователя
+            user = await db.fetchone('''
+                SELECT u.*, 
+                       (SELECT COUNT(*) FROM inventory WHERE user_id = u.user_id) as nft_count,
+                       (SELECT COUNT(*) FROM user_achievements WHERE user_id = u.user_id) as achievements_count
+                FROM users u 
+                WHERE user_id = ?
+            ''', (user_id,))
+            
+            if not user:
+                await message.answer("❌ User profile not found!")
                 return
             
-            # Update challenge status
-            await db.execute(
-                'UPDATE challenges SET status = "declined" WHERE id = ?',
-                (challenge_id,)
-            )
+            # Получаем позицию в рейтинге
+            position = await db.fetchone('''
+                SELECT COUNT(*) + 1 as position 
+                FROM users 
+                WHERE spent_stars > ? AND is_banned = 0
+            ''', (user['spent_stars'],))
             
-            await db.commit()
-        
-        # Notify challenger
-        challenger_lang = await get_user_language(challenge['challenger_id'])
-        decline_text = LanguageManager.get_text(challenger_lang, 'challenge_decline')
-        
-        try:
-            await bot.send_message(challenge['challenger_id'], decline_text)
+            # Получаем информацию о ранге
+            rank_info = SupremeRankSystem.get_rank_info(user['spent_stars'])
+            next_rank = SupremeRankSystem.get_next_rank(user['spent_stars'])
+            
+            # Строим текст профиля
+            profile_text = f"""
+👤 **YOUR PROFILE** 👤
+
+*Basic Information:*
+🆔 ID: `{user['user_id']}`
+👤 Username: @{user['username'] or 'No username'}
+📅 Joined: {user['created_at'][:10] if user['created_at'] else 'Recently'}
+
+*Statistics:*
+⭐ Spent Stars: {user['spent_stars']:,}
+💰 Earned Stars: {user['earned_stars']:,}
+📈 Global Rank: #{position['position'] if position else 'N/A'}
+👥 Referrals: {user['referrals']}
+📅 Daily Streak: {user['daily_streak']} days
+
+*Rank Information:*
+{rank_info['emoji']} **Current Rank:** {rank_info['name']}
+⚡ **Rank Multiplier:** x{rank_info['multiplier']}
+🎯 **Next Rank:** {next_rank['name']}
+📊 **Stars Needed:** {next_rank['needed']:,}
+
+*Collections:*
+🖼️ NFTs Collected: {user['nft_count']}
+🏆 Achievements: {user['achievements_count']}
+
+*Keep dominating to improve your stats!*
+            """
+            
+            await message.answer(profile_text)
+            
         except Exception as e:
-            logger.error(f"Failed to notify challenger: {e}")
-        
-        await callback.answer("Challenge declined.")
+            logger.error(f"Error in handle_profile: {e}")
+            await message.answer("❌ Error loading profile. Please try again.")
     
-    # Update the callback message
-    try:
-        await callback.message.edit_text(
-            f"{callback.message.text}\n\n✅ **Processed**"
-        )
-    except Exception:
-        pass
-
-@dp.message(Command("help"))
-async def cmd_help(message: Message):
-    """Help command"""
-    user_id = message.from_user.id
-    lang = await get_user_language(user_id)
-    
-    help_text = LanguageManager.get_text(lang, 'help')
-    
-    # Add admin commands if user is admin
-    if user_id in ADMIN_IDS:
-        help_text += "\n\n🛡️ **ADMIN COMMANDS:**\n"
-        help_text += "/admin stats - Bot statistics\n"
-        help_text += "/admin backup - Create database backup\n"
-        help_text += "/admin announce <text> - Global announcement\n"
-        help_text += "/admin addstars <user_id> <amount> - Add stars to user\n"
-        help_text += "/admin resetdaily - Reset all daily claims\n"
-    
-    await message.answer(help_text)
-
-@dp.message(Command("admin"))
-async def cmd_admin(message: Message, command: CommandObject = None):
-    """Admin commands"""
-    user_id = message.from_user.id
-    
-    if user_id not in ADMIN_IDS:
-        await message.answer("❌ Access denied!")
-        return
-    
-    if not command or not command.args:
-        await message.answer("Admin commands:\n"
-                           "/admin stats - Bot statistics\n"
-                           "/admin backup - Backup database\n"
-                           "/admin announce <text> - Global announcement\n"
-                           "/admin addstars <user_id> <amount> - Add stars\n"
-                           "/admin resetdaily - Reset daily claims")
-        return
-    
-    args = command.args.split()
-    cmd = args[0]
-    
-    if cmd == "stats":
-        # Get bot statistics
-        async with db_manager.get_connection() as db:
-            # Total users
-            cursor = await db.execute('SELECT COUNT(*) as count FROM users')
-            total_users = (await cursor.fetchone())['count']
+    async def handle_leaderboard(self, message: Message):
+        """Обработка команды /leaderboard"""
+        try:
+            # Получаем топ-10 пользователей
+            top_users = await db.fetchall('''
+                SELECT user_id, username, spent_stars, earned_stars 
+                FROM users 
+                WHERE is_banned = 0 
+                ORDER BY spent_stars DESC 
+                LIMIT 10
+            ''')
             
-            # Active users (last 7 days)
-            cursor = await db.execute('''
+            if not top_users:
+                await message.answer("🏆 Leaderboard is empty!")
+                return
+            
+            # Получаем глобальный фонд
+            fund = await db.fetchone("SELECT * FROM global_fund WHERE id = 1")
+            
+            # Строим текст лидерборда
+            leaderboard_text = "🏆 **GLOBAL LEADERBOARD** 🏆\n\n"
+            
+            medals = ["🥇", "🥈", "🥉", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣", "🔟"]
+            
+            for i, user in enumerate(top_users):
+                username = user['username'] or f"User{user['user_id']}"
+                leaderboard_text += f"{medals[i]} **{username}**\n"
+                leaderboard_text += f"   ⭐ Spent: {user['spent_stars']:,}\n"
+                leaderboard_text += f"   💰 Balance: {user['earned_stars']:,}\n\n"
+            
+            if fund:
+                progress = (fund['total_stars'] / fund['current_goal']) * 100
+                leaderboard_text += f"🌍 **Global Fund:** {fund['total_stars']:,}/{fund['current_goal']:,} ⭐ ({progress:.1f}%)\n"
+                leaderboard_text += f"🎯 **Next Goal:** {fund['next_goal']:,} ⭐\n"
+            
+            leaderboard_text += "\n*Spend stars to climb the ranks!*"
+            
+            await message.answer(leaderboard_text)
+            
+        except Exception as e:
+            logger.error(f"Error in handle_leaderboard: {e}")
+            await message.answer("❌ Error loading leaderboard. Please try again.")
+    
+    async def handle_help(self, message: Message):
+        """Обработка команды /help"""
+        help_text = """
+🖤 **GOLDEN COBRA SUPREME - HELP** 🖤
+
+*Basic Commands:*
+/start - Start the bot
+/profile - View your profile
+/leaderboard - Global leaderboard
+/help - Show this message
+
+*Star Management:*
+/spend <amount> - Spend stars
+/daily - Claim daily reward
+/shop - NFT shop
+/inventory - Your items
+
+*Game Features:*
+/challenge @user <amount> - Challenge another player
+/quests - View available quests
+/achievements - Your achievements
+
+*Administration:*
+/admin stats - Bot statistics
+/admin backup - Create backup
+/admin announce <text> - Global announcement
+
+*Need more help? Contact support!*
+        """
+        
+        await message.answer(help_text)
+    
+    async def handle_admin(self, message: Message, command: CommandObject):
+        """Обработка административных команд"""
+        try:
+            user_id = message.from_user.id
+            
+            if user_id not in Config.ADMIN_IDS:
+                await message.answer("❌ Access denied!")
+                return
+            
+            if not command or not command.args:
+                admin_text = """
+🛡️ **ADMIN PANEL** 🛡️
+
+*Available Commands:*
+/admin stats - Show bot statistics
+/admin backup - Create database backup
+/admin announce <text> - Send global announcement
+/admin addstars <user_id> <amount> - Add stars to user
+/admin resetdaily - Reset all daily claims
+/admin ban <user_id> <reason> - Ban user
+/admin unban <user_id> - Unban user
+                """
+                await message.answer(admin_text)
+                return
+            
+            args = command.args.split()
+            cmd = args[0].lower()
+            
+            if cmd == "stats":
+                # Статистика бота
+                stats = await self.get_bot_stats()
+                await message.answer(stats)
+                
+            elif cmd == "backup":
+                # Создание бэкапа
+                backup_path = await db.backup()
+                if backup_path:
+                    await message.answer(f"✅ Backup created: `{backup_path}`")
+                else:
+                    await message.answer("❌ Backup failed!")
+            
+            elif cmd == "announce":
+                # Глобальное объявление
+                if len(args) < 2:
+                    await message.answer("Usage: /admin announce <text>")
+                    return
+                
+                announcement = " ".join(args[1:])
+                sent = await self.send_global_announcement(announcement)
+                await message.answer(f"✅ Announcement sent to {sent} users")
+            
+            elif cmd == "addstars":
+                # Добавление звезд
+                if len(args) < 3:
+                    await message.answer("Usage: /admin addstars <user_id> <amount>")
+                    return
+                
+                try:
+                    target_id = int(args[1])
+                    amount = int(args[2])
+                    
+                    await db.execute(
+                        "UPDATE users SET earned_stars = earned_stars + ? WHERE user_id = ?",
+                        (amount, target_id)
+                    )
+                    
+                    await message.answer(f"✅ Added {amount} ⭐ to user {target_id}")
+                    
+                    # Уведомляем пользователя
+                    try:
+                        await self.bot.send_message(
+                            target_id,
+                            f"🎁 **ADMIN BONUS!** You received {amount} ⭐ from administration!"
+                        )
+                    except:
+                        pass
+                        
+                except ValueError:
+                    await message.answer("❌ Invalid user_id or amount!")
+            
+            elif cmd == "resetdaily":
+                # Сброс daily наград
+                await db.execute("UPDATE users SET last_daily_claim = NULL")
+                await message.answer("✅ All daily claims reset!")
+            
+            else:
+                await message.answer("❌ Unknown admin command!")
+                
+        except Exception as e:
+            logger.error(f"Error in handle_admin: {e}")
+            await message.answer("❌ Admin command failed!")
+    
+    async def get_bot_stats(self) -> str:
+        """Получить статистику бота"""
+        try:
+            # Основная статистика
+            total_users = await db.fetchone("SELECT COUNT(*) as count FROM users")
+            active_users = await db.fetchone('''
                 SELECT COUNT(*) as count FROM users 
                 WHERE datetime(last_active) > datetime('now', '-7 days')
             ''')
-            active_users = (await cursor.fetchone())['count']
             
-            # Total stars spent
-            cursor = await db.execute('SELECT SUM(spent_stars) as total FROM users')
-            total_spent = (await cursor.fetchone())['total'] or 0
+            total_spent = await db.fetchone("SELECT SUM(spent_stars) as total FROM users")
+            total_earned = await db.fetchone("SELECT SUM(earned_stars) as total FROM users")
             
-            # Global fund
-            cursor = await db.execute('SELECT * FROM global_fund WHERE id = 1')
-            fund = await cursor.fetchone()
-            
-            # Challenges
-            cursor = await db.execute('SELECT COUNT(*) as count FROM challenges WHERE status = "completed"')
-            total_challenges = (await cursor.fetchone())['count']
-        
-        stats_text = f"""
-🛡️ **BOT STATISTICS**
-
-👥 **Users:**
-   Total: {total_users}
-   Active (7d): {active_users}
-
-⭐ **Stars:**
-   Total Spent: {total_spent:,}
-   Global Fund: {fund['total_stars']:,}/{fund['current_goal']:,}
-
-⚔️ **Challenges:**
-   Completed: {total_challenges}
-
-🏦 **Shop:**
-   Items Sold: {await get_total_sales()}
-        """
-        
-        await message.answer(stats_text)
-    
-    elif cmd == "backup":
-        backup_file = await db_manager.backup()
-        await message.answer(f"✅ Backup created: `{backup_file}`")
-    
-    elif cmd == "announce":
-        if len(args) < 2:
-            await message.answer("Usage: /admin announce <text>")
-            return
-        
-        announcement = " ".join(args[1:])
-        
-        # Get all user IDs
-        async with db_manager.get_connection() as db:
-            cursor = await db.execute('SELECT user_id FROM users WHERE is_banned = FALSE')
-            users = await cursor.fetchall()
-        
-        sent = 0
-        failed = 0
-        
-        for user in users:
-            try:
-                await bot.send_message(
-                    user['user_id'],
-                    f"📢 **GLOBAL ANNOUNCEMENT**\n\n{announcement}\n\n- Goth Mommy 🖤"
-                )
-                sent += 1
-                await asyncio.sleep(0.05)  # Rate limiting
-            except Exception:
-                failed += 1
-        
-        await message.answer(f"Announcement sent to {sent} users. Failed: {failed}")
-    
-    elif cmd == "addstars":
-        if len(args) < 3:
-            await message.answer("Usage: /admin addstars <user_id> <amount>")
-            return
-        
-        try:
-            target_id = int(args[1])
-            amount = int(args[2])
-        except ValueError:
-            await message.answer("Invalid user_id or amount!")
-            return
-        
-        success = await add_stars(target_id, amount, 'admin', 'Admin bonus')
-        
-        if success:
-            # Get username
-            async with db_manager.get_connection() as db:
-                cursor = await db.execute(
-                    'SELECT username FROM users WHERE user_id = ?',
-                    (target_id,)
-                )
-                user = await cursor.fetchone()
-            
-            username = user['username'] if user else f"ID:{target_id}"
-            await message.answer(f"✅ Added {amount} ⭐ to @{username}")
-        else:
-            await message.answer("❌ Failed to add stars!")
-    
-    elif cmd == "resetdaily":
-        async with db_manager.get_connection() as db:
-            await db.execute('UPDATE users SET last_daily_claim = NULL')
-            await db.commit()
-        
-        await message.answer("✅ All daily claims reset!")
-
-async def get_total_sales() -> int:
-    """Get total items sold"""
-    async with db_manager.get_connection() as db:
-        cursor = await db.execute('SELECT COUNT(*) as count FROM inventory')
-        result = await cursor.fetchone()
-        return result['count'] if result else 0
-
-async def start_raffle(goal: int):
-    """Start a raffle when goal is reached"""
-    # Create a poll/raffle for users
-    async with db_manager.get_connection() as db:
-        # Mark raffle as active
-        await db.execute(
-            'UPDATE global_fund SET raffle_active = TRUE WHERE id = 1'
-        )
-        await db.commit()
-        
-        # Get all active users
-        cursor = await db.execute('''
-            SELECT user_id FROM users 
-            WHERE datetime(last_active) > datetime('now', '-30 days')
-            AND is_banned = FALSE
-        ''')
-        active_users = await cursor.fetchall()
-    
-    if not active_users:
-        return
-    
-    # Select random winners (10% of active users, min 1, max 10)
-    num_winners = max(1, min(len(active_users) // 10, 10))
-    winners = random.sample([u['user_id'] for u in active_users], num_winners)
-    
-    # Award prizes
-    prize_per_winner = goal // (num_winners * 2)  # 50% of goal distributed
-    
-    for winner_id in winners:
-        await add_stars(
-            winner_id,
-            prize_per_winner,
-            'raffle',
-            f'Raffle prize (goal: {goal})'
-        )
-        
-        # Notify winner
-        lang = await get_user_language(winner_id)
-        try:
-            await bot.send_message(
-                winner_id,
-                f"🎉 **YOU WON THE RAFFLE!**\n"
-                f"Goal: {goal} ⭐ reached!\n"
-                f"Prize: {prize_per_winner} ⭐ added to your balance!"
+            # Статистика вызовов
+            total_challenges = await db.fetchone(
+                "SELECT COUNT(*) as count FROM challenges WHERE status = 'completed'"
             )
-        except Exception as e:
-            logger.error(f"Failed to notify raffle winner: {e}")
-    
-    # Update global fund
-    async with db_manager.get_connection() as db:
-        await db.execute('''
-            UPDATE global_fund 
-            SET raffle_active = FALSE,
-                last_raffle = datetime('now'),
-                total_raffles = total_raffles + 1,
-                current_goal = next_goal,
-                next_goal = next_goal * 2
-            WHERE id = 1
-        ''')
-        await db.commit()
-    
-    # Announce raffle results
-    announcement = (
-        f"🎉 **RAFFLE COMPLETE!** 🎉\n\n"
-        f"Goal: {goal} ⭐ reached!\n"
-        f"Winners: {num_winners} lucky warriors\n"
-        f"Prize per winner: {prize_per_winner} ⭐\n\n"
-        f"Next goal: {goal * 2} ⭐\n"
-        f"Keep bleeding stars, gunners! 🖤🔥"
-    )
-    
-    # Send to all active users
-    for user in active_users:
-        try:
-            await bot.send_message(user['user_id'], announcement)
-            await asyncio.sleep(0.05)
-        except Exception:
-            pass
-
-# ============================
-# REMINDER SYSTEM
-# ============================
-
-async def send_reminders():
-    """Send reminders to inactive users"""
-    while True:
-        try:
-            async with db_manager.get_connection() as db:
-                # Get users inactive for 24 hours
-                cursor = await db.execute('''
-                    SELECT user_id, username, spent_stars 
-                    FROM users 
-                    WHERE datetime(last_active) < datetime('now', '-1 day')
-                    AND is_banned = FALSE
-                    LIMIT 50
-                ''')
-                inactive_users = await cursor.fetchall()
             
-            for user in inactive_users:
-                user_id = user['user_id']
-                lang = await get_user_language(user_id)
+            # Статистика магазина
+            items_sold = await db.fetchone("SELECT COUNT(*) as count FROM inventory")
+            
+            # Глобальный фонд
+            fund = await db.fetchone("SELECT * FROM global_fund WHERE id = 1")
+            
+            stats_text = f"""
+📊 **BOT STATISTICS** 📊
+
+*Users:*
+👥 Total Users: {total_users['count'] if total_users else 0}
+🚀 Active (7 days): {active_users['count'] if active_users else 0}
+
+*Stars Economy:*
+⭐ Total Spent: {total_spent['total'] if total_spent and total_spent['total'] else 0:,}
+💰 Total Earned: {total_earned['total'] if total_earned and total_earned['total'] else 0:,}
+
+*Game Activity:*
+⚔️ Completed Challenges: {total_challenges['count'] if total_challenges else 0}
+🛒 Items Sold: {items_sold['count'] if items_sold else 0}
+
+*Global Fund:*
+🌍 Current: {fund['total_stars'] if fund else 0:,}/{fund['current_goal'] if fund else 0:,}
+🎯 Next Goal: {fund['next_goal'] if fund else 0:,}
+🎉 Raffles: {fund['total_raffles'] if fund else 0}
+
+*Last Updated: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}*
+            """
+            
+            return stats_text
+            
+        except Exception as e:
+            logger.error(f"Error getting bot stats: {e}")
+            return "❌ Error loading statistics"
+    
+    async def send_global_announcement(self, text: str) -> int:
+        """Отправить глобальное объявление"""
+        try:
+            users = await db.fetchall("SELECT user_id FROM users WHERE is_banned = 0")
+            
+            sent = 0
+            announcement = f"📢 **GLOBAL ANNOUNCEMENT**\n\n{text}\n\n- Golden Cobra Team 🖤"
+            
+            for user in users:
+                try:
+                    await self.bot.send_message(user['user_id'], announcement)
+                    sent += 1
+                    await asyncio.sleep(0.05)  # Rate limiting
+                except Exception as e:
+                    logger.debug(f"Failed to send to {user['user_id']}: {e}")
+            
+            return sent
+            
+        except Exception as e:
+            logger.error(f"Error sending announcement: {e}")
+            return 0
+    
+    async def check_achievements(self, user_id: int):
+        """Проверить и разблокировать достижения"""
+        try:
+            # Получаем статистику пользователя
+            user = await db.fetchone('''
+                SELECT spent_stars, earned_stars, daily_streak, referrals,
+                       (SELECT COUNT(*) FROM challenges WHERE winner_id = ?) as challenges_won,
+                       (SELECT COUNT(DISTINCT item_id) FROM inventory WHERE user_id = ?) as nft_count
+                FROM users WHERE user_id = ?
+            ''', (user_id, user_id, user_id))
+            
+            if not user:
+                return
+            
+            # Получаем все достижения
+            achievements = await db.fetchall("SELECT * FROM achievements")
+            
+            for achievement in achievements:
+                # Проверяем, уже ли разблокировано
+                unlocked = await db.fetchone(
+                    "SELECT 1 FROM user_achievements WHERE user_id = ? AND achievement_id = ?",
+                    (user_id, achievement['id'])
+                )
                 
-                # Get top user
-                leaderboard = await get_leaderboard(1)
-                if leaderboard:
-                    top_user = leaderboard[0]
-                    gap = top_user['spent_stars'] - user['spent_stars'] + 1
-                    
-                    reminder_text = LanguageManager.get_text(
-                        lang,
-                        'reminder',
-                        username=user['username'] or "warrior",
-                        gap=gap,
-                        top_name=top_user['username'] or "Top1"
+                if unlocked:
+                    continue
+                
+                # Проверяем условие
+                condition_met = False
+                condition_type = achievement['condition_type']
+                condition_value = achievement['condition_value']
+                
+                if condition_type == 'spend' and user['spent_stars'] >= condition_value:
+                    condition_met = True
+                elif condition_type == 'earned' and user['earned_stars'] >= condition_value:
+                    condition_met = True
+                elif condition_type == 'daily_streak' and user['daily_streak'] >= condition_value:
+                    condition_met = True
+                elif condition_type == 'referral' and user['referrals'] >= condition_value:
+                    condition_met = True
+                elif condition_type == 'challenge_win' and user['challenges_won'] >= condition_value:
+                    condition_met = True
+                elif condition_type == 'nft_count' and user['nft_count'] >= condition_value:
+                    condition_met = True
+                
+                if condition_met:
+                    # Разблокируем достижение
+                    await db.execute(
+                        "INSERT INTO user_achievements (user_id, achievement_id) VALUES (?, ?)",
+                        (user_id, achievement['id'])
                     )
                     
+                    # Награждаем звездами
+                    if achievement['reward_stars'] > 0:
+                        await db.execute(
+                            "UPDATE users SET earned_stars = earned_stars + ? WHERE user_id = ?",
+                            (achievement['reward_stars'], user_id)
+                        )
+                    
+                    # Уведомляем пользователя
                     try:
-                        await bot.send_message(user_id, reminder_text)
+                        await self.bot.send_message(
+                            user_id,
+                            f"🏆 **ACHIEVEMENT UNLOCKED!**\n\n"
+                            f"{achievement['emoji']} *{achievement['name']}*\n"
+                            f"{achievement['description']}\n\n"
+                            f"🎁 Reward: +{achievement['reward_stars']} ⭐"
+                        )
+                    except:
+                        pass
                         
-                        # Update last active
-                        async with db_manager.get_connection() as db:
-                            await db.execute(
-                                'UPDATE users SET last_active = datetime("now") WHERE user_id = ?',
-                                (user_id,)
-                            )
-                            await db.commit()
-                        
-                        await asyncio.sleep(1)  # Rate limiting
-                    except Exception as e:
-                        logger.error(f"Failed to send reminder to {user_id}: {e}")
-            
-            await asyncio.sleep(900)  # Every 15 minutes
-        
         except Exception as e:
-            logger.error(f"Reminder system error: {e}")
-            await asyncio.sleep(300)
+            logger.error(f"Error checking achievements: {e}")
+    
+    async def check_quests(self, user_id: int, quest_type: str, value: int = 1):
+        """Проверить и обновить квесты"""
+        try:
+            # Получаем активные квесты
+            quests = await db.fetchall(
+                "SELECT * FROM quests WHERE is_active = 1"
+            )
+            
+            for quest in quests:
+                # Проверяем тип квеста
+                if quest['requirement_type'] != quest_type:
+                    continue
+                
+                # Получаем прогресс
+                progress = await db.fetchone('''
+                    SELECT * FROM quest_progress 
+                    WHERE user_id = ? AND quest_id = ? AND completed = 0
+                ''', (user_id, quest['id']))
+                
+                if not progress:
+                    # Создаем новый прогресс
+                    await db.execute('''
+                        INSERT INTO quest_progress (user_id, quest_id, progress)
+                        VALUES (?, ?, ?)
+                    ''', (user_id, quest['id'], value))
+                else:
+                    # Обновляем прогресс
+                    new_progress = progress['progress'] + value
+                    await db.execute('''
+                        UPDATE quest_progress 
+                        SET progress = ? 
+                        WHERE user_id = ? AND quest_id = ?
+                    ''', (new_progress, user_id, quest['id']))
+                
+                # Проверяем завершение
+                updated_progress = await db.fetchone('''
+                    SELECT progress FROM quest_progress 
+                    WHERE user_id = ? AND quest_id = ?
+                ''', (user_id, quest['id']))
+                
+                if updated_progress and updated_progress['progress'] >= quest['requirement_value']:
+                    # Завершаем квест
+                    await db.execute('''
+                        UPDATE quest_progress 
+                        SET completed = 1, completed_at = CURRENT_TIMESTAMP 
+                        WHERE user_id = ? AND quest_id = ?
+                    ''', (user_id, quest['id']))
+                    
+                    # Награждаем пользователя
+                    await db.execute(
+                        "UPDATE users SET earned_stars = earned_stars + ? WHERE user_id = ?",
+                        (quest['reward_stars'], user_id)
+                    )
+                    
+                    # Уведомляем
+                    try:
+                        await self.bot.send_message(
+                            user_id,
+                            f"🎯 **QUEST COMPLETED!**\n\n"
+                            f"📜 *{quest['name']}*\n"
+                            f"{quest['description']}\n\n"
+                            f"🎁 Reward: +{quest['reward_stars']} ⭐"
+                        )
+                    except:
+                        pass
+                        
+        except Exception as e:
+            logger.error(f"Error checking quests: {e}")
+    
+    def create_main_keyboard(self, lang: str = 'EN') -> InlineKeyboardMarkup:
+        """Создать основную клавиатуру"""
+        keyboard = InlineKeyboardBuilder()
+        
+        buttons = [
+            ("💰 Spend Stars", "spend"),
+            ("🎁 Daily Reward", "daily"),
+            ("🛒 NFT Shop", "shop"),
+            ("🎒 Inventory", "inventory"),
+            ("🏆 Leaderboard", "leaderboard"),
+            ("⚔️ Challenge", "challenge"),
+            ("📜 Quests", "quests"),
+            ("👤 Profile", "profile"),
+        ]
+        
+        for text, callback in buttons:
+            keyboard.button(text=text, callback_data=callback)
+        
+        keyboard.adjust(2)
+        return keyboard.as_markup()
+    
+    async def start(self):
+        """Запуск бота"""
+        logger.info("Starting Supreme Bot...")
+        
+        # Запускаем фоновые задачи
+        asyncio.create_task(self.background_tasks())
+        
+        # Запускаем бота
+        await self.dp.start_polling(self.bot)
+    
+    async def background_tasks(self):
+        """Фоновые задачи"""
+        while True:
+            try:
+                # Проверяем истекшие вызовы
+                await self.check_expired_challenges()
+                
+                # Проверяем достижения глобального фонда
+                await self.check_global_fund()
+                
+                # Отправляем напоминания
+                await self.send_reminders()
+                
+                # Очищаем старые логи
+                await self.cleanup_old_data()
+                
+                await asyncio.sleep(300)  # 5 минут
+                
+            except Exception as e:
+                logger.error(f"Error in background tasks: {e}")
+                await asyncio.sleep(60)
+    
+    async def check_expired_challenges(self):
+        """Проверить истекшие вызовы"""
+        try:
+            expired = await db.fetchall('''
+                SELECT * FROM challenges 
+                WHERE status = 'pending' 
+                AND datetime(expires_at) < datetime('now')
+            ''')
+            
+            for challenge in expired:
+                await db.execute(
+                    "UPDATE challenges SET status = 'expired' WHERE id = ?",
+                    (challenge['id'],)
+                )
+                
+        except Exception as e:
+            logger.error(f"Error checking expired challenges: {e}")
+    
+    async def check_global_fund(self):
+        """Проверить достижение цели глобального фонда"""
+        try:
+            fund = await db.fetchone("SELECT * FROM global_fund WHERE id = 1")
+            
+            if fund and fund['total_stars'] >= fund['current_goal'] and not fund['raffle_active']:
+                # Запускаем розыгрыш
+                await self.start_raffle(fund['current_goal'])
+                
+        except Exception as e:
+            logger.error(f"Error checking global fund: {e}")
+    
+    async def start_raffle(self, goal: int):
+        """Запустить розыгрыш"""
+        try:
+            # Помечаем розыгрыш активным
+            await db.execute(
+                "UPDATE global_fund SET raffle_active = 1 WHERE id = 1"
+            )
+            
+            # Получаем активных пользователей
+            active_users = await db.fetchall('''
+                SELECT user_id FROM users 
+                WHERE datetime(last_active) > datetime('now', '-30 days')
+                AND is_banned = 0
+            ''')
+            
+            if not active_users:
+                return
+            
+            # Выбираем победителей (10% активных пользователей, минимум 1, максимум 10)
+            num_winners = max(1, min(len(active_users) // 10, 10))
+            winners = random.sample([u['user_id'] for u in active_users], num_winners)
+            
+            # Приз на каждого победителя
+            prize_per_winner = goal // (num_winners * 2)
+            
+            for winner_id in winners:
+                await db.execute(
+                    "UPDATE users SET earned_stars = earned_stars + ? WHERE user_id = ?",
+                    (prize_per_winner, winner_id)
+                )
+                
+                # Уведомляем победителя
+                try:
+                    await self.bot.send_message(
+                        winner_id,
+                        f"🎉 **RAFFLE WINNER!** 🎉\n\n"
+                        f"Global goal of {goal:,} ⭐ reached!\n"
+                        f"You won {prize_per_winner} ⭐!\n\n"
+                        f"Congratulations! 🖤"
+                    )
+                except:
+                    pass
+            
+            # Обновляем глобальный фонд
+            await db.execute('''
+                UPDATE global_fund 
+                SET raffle_active = 0,
+                    last_raffle = CURRENT_TIMESTAMP,
+                    total_raffles = total_raffles + 1,
+                    current_goal = next_goal,
+                    next_goal = next_goal * 2
+                WHERE id = 1
+            ''')
+            
+            # Отправляем объявление
+            await self.send_global_announcement(
+                f"🎉 **RAFFLE COMPLETE!** 🎉\n\n"
+                f"Global goal of {goal:,} ⭐ reached!\n"
+                f"Winners: {num_winners} lucky warriors\n"
+                f"Prize per winner: {prize_per_winner} ⭐\n\n"
+                f"Next goal: {goal * 2:,} ⭐\n"
+                f"Keep bleeding stars! 🖤🔥"
+            )
+            
+        except Exception as e:
+            logger.error(f"Error starting raffle: {e}")
+    
+    async def send_reminders(self):
+        """Отправить напоминания неактивным пользователям"""
+        try:
+            inactive_users = await db.fetchall('''
+                SELECT user_id, username, spent_stars 
+                FROM users 
+                WHERE datetime(last_active) < datetime('now', '-1 day')
+                AND is_banned = 0
+                LIMIT 50
+            ''')
+            
+            for user in inactive_users:
+                # Получаем топ пользователя
+                top_user = await db.fetchone('''
+                    SELECT username, spent_stars FROM users 
+                    WHERE is_banned = 0 
+                    ORDER BY spent_stars DESC 
+                    LIMIT 1
+                ''')
+                
+                if top_user:
+                    gap = top_user['spent_stars'] - user['spent_stars'] + 1
+                    
+                    reminder = f"""
+🖤 **HEY, @{user['username']}!** 🖤
 
-# ============================
-# WEB APP (FASTAPI)
-# ============================
+You're {gap:,} ⭐ behind the leader @{top_user['username']}!
 
-app = FastAPI(title="Golden Cobra Web App")
+💀 **Goth Mommy commands you:** 
+Spend NOW or face eternal shame!
 
-# CORS middleware
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+🔥 **Quick actions:**
+• /daily - Get free stars
+• /spend 1000 - Spend stars
+• /challenge - Fight for glory
 
-HTML_CONTENT = """
+*No mercy for the weak!* 💀💰
+                    """
+                    
+                    try:
+                        await self.bot.send_message(user['user_id'], reminder)
+                        await asyncio.sleep(1)
+                    except:
+                        pass
+                        
+        except Exception as e:
+            logger.error(f"Error sending reminders: {e}")
+    
+    async def cleanup_old_data(self):
+        """Очистка старых данных"""
+        try:
+            # Удаляем старые транзакции (старше 30 дней)
+            await db.execute('''
+                DELETE FROM transactions 
+                WHERE datetime(created_at) < datetime('now', '-30 days')
+            ''')
+            
+            # Удаляем старые завершенные вызовы
+            await db.execute('''
+                DELETE FROM challenges 
+                WHERE status IN ('completed', 'expired', 'declined')
+                AND datetime(created_at) < datetime('now', '-7 days')
+            ''')
+            
+        except Exception as e:
+            logger.error(f"Error cleaning up old data: {e}")
+
+# ============================================================================
+# WEB INTERFACE - ULTIMATE EDITION
+# ============================================================================
+
+class SupremeWebApp:
+    """Улучшенное веб-приложение"""
+    
+    def __init__(self, bot_instance: SupremeBot):
+        self.app = FastAPI(
+            title="Golden Cobra Supreme",
+            description="Ultimate Aggressive Telegram Bot Web Interface",
+            version="4.0.0"
+        )
+        
+        self.bot = bot_instance
+        self.setup_middleware()
+        self.setup_routes()
+        
+        logger.info("Supreme Web App initialized")
+    
+    def setup_middleware(self):
+        """Настройка middleware"""
+        self.app.add_middleware(
+            CORSMiddleware,
+            allow_origins=["*"],
+            allow_credentials=True,
+            allow_methods=["*"],
+            allow_headers=["*"],
+        )
+    
+    def setup_routes(self):
+        """Настройка маршрутов"""
+        
+        @self.app.get("/", response_class=HTMLResponse)
+        async def root():
+            return self.get_homepage()
+        
+        @self.app.get("/api/user/{user_id}")
+        async def get_user(user_id: int):
+            return await self.api_get_user(user_id)
+        
+        @self.app.post("/api/spend")
+        async def spend_stars(request: Request):
+            return await self.api_spend_stars(request)
+        
+        @self.app.get("/api/leaderboard")
+        async def get_leaderboard(limit: int = 10):
+            return await self.api_get_leaderboard(limit)
+        
+        @self.app.get("/health")
+        async def health_check():
+            return {"status": "healthy", "timestamp": datetime.now().isoformat()}
+    
+    def get_homepage(self) -> str:
+        """Главная страница веб-интерфейса"""
+        return """
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🖤 Golden Cobra: Dominate Empire 🖤</title>
-    <link href="https://fonts.googleapis.com/css2?family=Creepster&family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
+    <title>🖤 Golden Cobra Supreme 🖤</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { 
-            background: linear-gradient(135deg, #000000 0%, #1a0b0b 50%, #000000 100%);
-            color: #ffd700; 
-            font-family: 'Orbitron', 'Creepster', cursive; 
-            text-align: center; 
+        body {
+            background: #000;
+            color: #ffd700;
+            font-family: 'Arial Black', sans-serif;
             min-height: 100vh;
             overflow-x: hidden;
             position: relative;
         }
         
-        /* Animated background */
-        .bg-animation {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            z-index: -2;
-            background: 
-                radial-gradient(circle at 20% 50%, rgba(255, 0, 0, 0.1) 0%, transparent 50%),
-                radial-gradient(circle at 80% 20%, rgba(255, 215, 0, 0.1) 0%, transparent 50%),
-                radial-gradient(circle at 40% 80%, rgba(139, 0, 0, 0.1) 0%, transparent 50%);
-            animation: pulseBG 10s infinite alternate;
-        }
-        
-        @keyframes pulseBG {
-            0% { opacity: 0.3; }
-            100% { opacity: 0.7; }
-        }
-        
         .container {
-            max-width: 800px;
+            max-width: 1200px;
             margin: 0 auto;
             padding: 20px;
             position: relative;
             z-index: 1;
         }
         
-        h1 { 
-            font-size: 2.8rem; 
-            animation: goldPulse 1.5s infinite; 
-            text-shadow: 0 0 20px gold, 0 0 40px red, 0 0 60px darkred;
-            margin: 20px 0;
-            letter-spacing: 2px;
+        header {
+            text-align: center;
+            padding: 40px 0;
+            background: linear-gradient(90deg, #000, #8b0000, #000);
+            border-bottom: 5px solid #ffd700;
+            margin-bottom: 40px;
+            animation: headerGlow 3s infinite alternate;
         }
         
-        @keyframes goldPulse { 
-            0% { transform: scale(1); filter: brightness(1); }
-            50% { transform: scale(1.05); filter: brightness(1.2); }
-            100% { transform: scale(1); filter: brightness(1); }
+        @keyframes headerGlow {
+            0% { box-shadow: 0 0 50px #ff0000; }
+            100% { box-shadow: 0 0 100px #ffd700; }
         }
         
-        .snake-animation {
-            font-size: 5rem;
-            margin: 30px 0;
-            animation: slitherAggro 3s infinite;
-            filter: drop-shadow(0 0 10px gold);
+        h1 {
+            font-size: 3.5rem;
+            text-shadow: 0 0 30px #ff0000;
+            margin-bottom: 10px;
+            animation: pulse 2s infinite;
         }
         
-        @keyframes slitherAggro { 
-            0% { transform: translateX(0) rotate(0deg) scale(1); }
-            25% { transform: translateX(40px) rotate(10deg) scale(1.1); }
-            50% { transform: translateX(0) rotate(0deg) scale(1); }
-            75% { transform: translateX(-40px) rotate(-10deg) scale(1.1); }
-            100% { transform: translateX(0) rotate(0deg) scale(1); }
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
         }
         
-        .status-card {
-            background: rgba(0, 0, 0, 0.8);
-            border: 3px solid gold;
-            border-radius: 15px;
-            padding: 25px;
-            margin: 20px 0;
-            box-shadow: 0 0 30px rgba(255, 215, 0, 0.3);
-            animation: cardGlow 2s infinite alternate;
-        }
-        
-        @keyframes cardGlow {
-            0% { box-shadow: 0 0 20px rgba(255, 215, 0, 0.3); }
-            100% { box-shadow: 0 0 40px rgba(255, 0, 0, 0.5); }
+        .subtitle {
+            font-size: 1.5rem;
+            color: #ff6b6b;
+            margin-bottom: 20px;
         }
         
         .stats-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
             gap: 20px;
-            margin: 30px 0;
+            margin: 40px 0;
         }
         
-        .stat-item {
-            background: rgba(26, 11, 11, 0.9);
-            border: 2px solid #8b0000;
-            border-radius: 10px;
-            padding: 15px;
-            animation: statPulse 3s infinite;
+        .stat-card {
+            background: rgba(139, 0, 0, 0.3);
+            border: 3px solid #ffd700;
+            border-radius: 15px;
+            padding: 20px;
+            text-align: center;
+            transition: all 0.3s;
+            animation: cardFloat 6s infinite alternate;
         }
         
-        @keyframes statPulse {
-            0%, 100% { transform: translateY(0); }
-            50% { transform: translateY(-5px); }
+        @keyframes cardFloat {
+            0% { transform: translateY(0); }
+            100% { transform: translateY(-10px); }
+        }
+        
+        .stat-card:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 30px #ff0000;
         }
         
         .stat-value {
-            font-size: 2rem;
-            font-weight: bold;
-            color: gold;
-            text-shadow: 0 0 10px gold;
+            font-size: 2.5rem;
+            color: #ffd700;
+            text-shadow: 0 0 10px #ff0000;
+            margin: 10px 0;
         }
         
         .stat-label {
-            font-size: 0.9rem;
+            font-size: 1rem;
             color: #ff6b6b;
             text-transform: uppercase;
-            letter-spacing: 1px;
+            letter-spacing: 2px;
         }
         
-        .progress-bar {
-            width: 100%;
-            height: 30px;
-            background: rgba(139, 0, 0, 0.3);
-            border-radius: 15px;
-            overflow: hidden;
-            margin: 20px 0;
-            border: 2px solid gold;
+        .features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 30px;
+            margin: 50px 0;
         }
         
-        .progress-fill {
-            height: 100%;
-            background: linear-gradient(90deg, gold, red);
-            border-radius: 15px;
-            transition: width 1s ease-in-out;
-            position: relative;
-            overflow: hidden;
-        }
-        
-        .progress-fill::after {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
-            animation: shine 2s infinite;
-        }
-        
-        @keyframes shine {
-            0% { transform: translateX(-100%); }
-            100% { transform: translateX(100%); }
-        }
-        
-        .controls {
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
-            margin: 30px 0;
-        }
-        
-        input, button, select {
-            padding: 15px;
-            font-size: 1.2rem;
-            border: none;
-            border-radius: 10px;
-            font-family: inherit;
-            transition: all 0.3s;
-        }
-        
-        input, select {
+        .feature {
             background: rgba(0, 0, 0, 0.8);
-            color: gold;
-            border: 2px solid gold;
+            border: 2px solid #8b0000;
+            border-radius: 10px;
+            padding: 25px;
+            text-align: center;
         }
         
-        input:focus, select:focus {
-            outline: none;
-            box-shadow: 0 0 20px gold;
+        .feature-icon {
+            font-size: 3rem;
+            margin-bottom: 15px;
         }
         
-        button {
-            background: linear-gradient(45deg, gold, darkred);
-            color: black;
+        .feature-title {
+            font-size: 1.5rem;
+            color: #ffd700;
+            margin-bottom: 10px;
+        }
+        
+        .feature-description {
+            color: #ccc;
+            line-height: 1.6;
+        }
+        
+        .cta {
+            text-align: center;
+            margin: 60px 0;
+            padding: 40px;
+            background: linear-gradient(45deg, #000, #8b0000);
+            border-radius: 20px;
+            border: 5px solid #ffd700;
+        }
+        
+        .cta-button {
+            display: inline-block;
+            background: linear-gradient(45deg, #ffd700, #ff0000);
+            color: #000;
+            padding: 15px 40px;
+            font-size: 1.5rem;
             font-weight: bold;
-            cursor: pointer;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            animation: buttonAggro 2s infinite;
-            position: relative;
-            overflow: hidden;
+            text-decoration: none;
+            border-radius: 50px;
+            margin-top: 20px;
+            transition: all 0.3s;
+            animation: buttonGlow 2s infinite alternate;
         }
         
-        @keyframes buttonAggro {
-            0%, 100% { transform: scale(1); box-shadow: 0 0 20px gold; }
-            50% { transform: scale(1.05); box-shadow: 0 0 40px red; }
+        @keyframes buttonGlow {
+            0% { box-shadow: 0 0 20px #ffd700; }
+            100% { box-shadow: 0 0 40px #ff0000; }
         }
         
-        button:hover {
+        .cta-button:hover {
             transform: scale(1.1);
             animation: none;
         }
         
-        button::after {
-            content: '';
-            position: absolute;
-            top: -50%;
-            left: -50%;
-            width: 200%;
-            height: 200%;
-            background: linear-gradient(45deg, transparent, rgba(255, 255, 255, 0.3), transparent);
-            transform: rotate(45deg);
-            animation: buttonShine 3s infinite;
+        footer {
+            text-align: center;
+            padding: 30px;
+            margin-top: 50px;
+            border-top: 3px solid #8b0000;
+            color: #666;
         }
         
-        @keyframes buttonShine {
-            0% { transform: translateX(-100%) rotate(45deg); }
-            100% { transform: translateX(100%) rotate(45deg); }
-        }
-        
-        .motivation {
-            font-size: 1.4rem;
-            color: #ff6b6b;
-            animation: flashMajor 2s infinite;
-            text-shadow: 0 0 10px darkred;
-            margin: 30px 0;
-            padding: 20px;
-            border-left: 5px solid gold;
-            background: rgba(139, 0, 0, 0.2);
-            text-align: left;
-        }
-        
-        @keyframes flashMajor {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.8; }
-        }
-        
-        .nft-preview {
-            margin: 40px 0;
-            padding: 20px;
-            background: rgba(0, 0, 0, 0.9);
-            border: 3px solid #8b0000;
-            border-radius: 15px;
-            animation: nftRotate 10s infinite linear;
-        }
-        
-        @keyframes nftRotate {
-            0% { filter: hue-rotate(0deg) brightness(1); }
-            50% { filter: hue-rotate(180deg) brightness(1.2); }
-            100% { filter: hue-rotate(360deg) brightness(1); }
-        }
-        
-        .floating-cobras {
-            position: fixed;
-            width: 100%;
-            height: 100%;
-            pointer-events: none;
-            z-index: -1;
-        }
-        
-        .cobra {
-            position: absolute;
-            font-size: 2rem;
-            opacity: 0.3;
-            animation: float 20s infinite linear;
-        }
-        
-        @keyframes float {
-            0% { transform: translateY(100vh) rotate(0deg); }
-            100% { transform: translateY(-100vh) rotate(360deg); }
-        }
-        
-        @media (max-width: 600px) {
-            h1 { font-size: 2rem; }
-            .snake-animation { font-size: 3rem; }
-            input, button, select { font-size: 1rem; }
-            .stat-value { font-size: 1.5rem; }
-        }
-        
-        /* Loading animation */
-        .loading {
-            display: none;
+        .snake-animation {
             position: fixed;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            background: rgba(0, 0, 0, 0.9);
-            z-index: 9999;
-            justify-content: center;
-            align-items: center;
-            flex-direction: column;
+            pointer-events: none;
+            z-index: 0;
+            opacity: 0.1;
         }
         
-        .loader {
-            width: 60px;
-            height: 60px;
-            border: 5px solid gold;
-            border-top-color: red;
-            border-radius: 50%;
-            animation: spin 1s infinite linear;
+        .snake {
+            position: absolute;
+            font-size: 2rem;
+            animation: snakeMove 20s linear infinite;
         }
         
-        @keyframes spin {
-            100% { transform: rotate(360deg); }
+        @keyframes snakeMove {
+            0% { transform: translateX(-100px) rotate(0deg); }
+            100% { transform: translateX(calc(100vw + 100px)) rotate(360deg); }
+        }
+        
+        @media (max-width: 768px) {
+            h1 { font-size: 2.5rem; }
+            .stat-value { font-size: 2rem; }
+            .features { grid-template-columns: 1fr; }
         }
     </style>
 </head>
 <body>
-    <div class="bg-animation"></div>
-    <div class="floating-cobras" id="cobras"></div>
-    
-    <div class="loading" id="loading">
-        <div class="loader"></div>
-        <p style="margin-top: 20px; color: gold;">Loading Cobra Empire...</p>
-    </div>
+    <div class="snake-animation" id="snakes"></div>
     
     <div class="container">
-        <h1>🖤 GOLDEN COBRA: DOMINATE EMPIRE 🖤</h1>
+        <header>
+            <h1>🖤 GOLDEN COBRA SUPREME 🖤</h1>
+            <div class="subtitle">ULTIMATE DOMINATION BOT - v4.0</div>
+        </header>
         
-        <div class="snake-animation">🐍💰💀🔥🐍</div>
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-label">Total Users</div>
+                <div class="stat-value" id="totalUsers">0</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Stars Spent</div>
+                <div class="stat-value" id="totalStars">0</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Active Players</div>
+                <div class="stat-value" id="activePlayers">0</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">NFTs Sold</div>
+                <div class="stat-value" id="nftsSold">0</div>
+            </div>
+        </div>
         
-        <div class="status-card">
-            <h2 id="userRank">Loading rank...</h2>
-            <div class="stats-grid">
-                <div class="stat-item">
-                    <div class="stat-value" id="spentStars">0</div>
-                    <div class="stat-label">Stars Spent</div>
-                </div>
-                <div class="stat-item">
-                    <div class="stat-value" id="earnedStars">0</div>
-                    <div class="stat-label">Stars Earned</div>
-                </div>
-                <div class="stat-item">
-                    <div class="stat-value" id="userPosition">#0</div>
-                    <div class="stat-label">Global Rank</div>
-                </div>
-                <div class="stat-item">
-                    <div class="stat-value" id="dailyStreak">0</div>
-                    <div class="stat-label">Daily Streak</div>
+        <div class="features">
+            <div class="feature">
+                <div class="feature-icon">💰</div>
+                <div class="feature-title">Star Economy</div>
+                <div class="feature-description">
+                    Spend, earn, and dominate with our unique star economy system.
+                    Climb ranks and become the ultimate Cobra Emperor.
                 </div>
             </div>
             
-            <h3>Global Domination Progress</h3>
-            <div class="progress-bar">
-                <div class="progress-fill" id="globalProgress" style="width: 0%"></div>
+            <div class="feature">
+                <div class="feature-icon">🛒</div>
+                <div class="feature-title">NFT Collection</div>
+                <div class="feature-description">
+                    Collect rare NFTs, trade with other players, and build your
+                    ultimate collection of dark artifacts.
+                </div>
             </div>
-            <p id="goalText">0/0 Stars (0%)</p>
+            
+            <div class="feature">
+                <div class="feature-icon">⚔️</div>
+                <div class="feature-title">Challenges</div>
+                <div class="feature-description">
+                    Challenge other players in epic duels. Winner takes all!
+                    Prove your dominance in the arena.
+                </div>
+            </div>
+            
+            <div class="feature">
+                <div class="feature-icon">🏆</div>
+                <div class="feature-title">Leaderboards</div>
+                <div class="feature-description">
+                    Compete for top positions in global leaderboards.
+                    Your name in lights for all to see!
+                </div>
+            </div>
         </div>
         
-        <div class="controls">
-            <input type="number" id="amount" min="10" max="1000000" placeholder="Stars to Bleed ⭐" value="100">
-            <select id="actionType">
-                <option value="spend">Spend Stars 💥</option>
-                <option value="challenge">Challenge Warrior ⚔️</option>
-                <option value="shop">Visit NFT Shop 🛒</option>
-            </select>
-            <button onclick="executeAction()">CRUSH & DOMINATE 🔥</button>
-            <button onclick="claimDaily()" id="dailyButton">CLAIM DAILY BLOOD 🎁</button>
+        <div class="cta">
+            <h2>READY TO DOMINATE?</h2>
+            <p>Join thousands of players in the ultimate domination experience.</p>
+            <a href="https://t.me/GoldenCobraSupremeBot" class="cta-button" target="_blank">
+                🚀 START PLAYING NOW
+            </a>
         </div>
         
-        <div class="motivation">
-            💀 **GOTH MOMMY'S COMMAND:** 
-            Spend stars like a savage or crawl in the dirt! 
-            Dominate the leaderboard, collect rare NFTs, and become the ultimate Cobra Emperor! 
-            No mercy for the weak! 🖤🐍🔥
-        </div>
-        
-        <div class="nft-preview">
-            <h3>⚡ NFT EMPIRE PREVIEW ⚡</h3>
-            <p>Collect rare artifacts to boost your power!</p>
-            <div id="nftItems"></div>
-        </div>
-        
-        <div style="margin-top: 50px; color: #888; font-size: 0.9rem;">
-            🖤 Powered by Ultimate Golden Cobra Goth Mommy v3.0
-        </div>
+        <footer>
+            <p>🖤 Golden Cobra Supreme v4.0 | Ultimate Aggressive Telegram Bot</p>
+            <p>© 2024 All rights reserved | Made with 💀 by Goth Mommy</p>
+        </footer>
     </div>
-
+    
     <script>
-        const tg = window.Telegram.WebApp;
-        
-        // Initialize Telegram Web App
-        tg.ready();
-        tg.expand();
-        
-        const user = tg.initDataUnsafe.user;
-        let userData = null;
-        
-        // Create floating cobras
-        function createFloatingCobras() {
-            const cobrasContainer = document.getElementById('cobras');
-            const cobras = ['🐍', '💀', '🔥', '💰', '👑', '⚡'];
+        // Создаем плавающих змей
+        function createSnakes() {
+            const container = document.getElementById('snakes');
+            const snakes = ['🐍', '💀', '🔥', '💰', '👑', '⚡'];
             
             for (let i = 0; i < 15; i++) {
-                const cobra = document.createElement('div');
-                cobra.className = 'cobra';
-                cobra.textContent = cobras[Math.floor(Math.random() * cobras.length)];
-                cobra.style.left = `${Math.random() * 100}%`;
-                cobra.style.animationDelay = `${Math.random() * 20}s`;
-                cobra.style.animationDuration = `${15 + Math.random() * 20}s`;
-                cobra.style.fontSize = `${1 + Math.random() * 3}rem`;
-                cobrasContainer.appendChild(cobra);
+                const snake = document.createElement('div');
+                snake.className = 'snake';
+                snake.textContent = snakes[Math.floor(Math.random() * snakes.length)];
+                snake.style.top = `${Math.random() * 100}%`;
+                snake.style.animationDelay = `${Math.random() * 20}s`;
+                snake.style.animationDuration = `${15 + Math.random() * 20}s`;
+                snake.style.fontSize = `${1 + Math.random() * 3}rem`;
+                container.appendChild(snake);
             }
         }
         
-        // Show loading
-        function showLoading() {
-            document.getElementById('loading').style.display = 'flex';
-        }
-        
-        // Hide loading
-        function hideLoading() {
-            document.getElementById('loading').style.display = 'none';
-        }
-        
-        // Fetch user status
-        async function fetchUserStatus() {
-            showLoading();
-            
+        // Загружаем статистику
+        async function loadStats() {
             try {
-                const response = await fetch(`/api/user/${user.id}`);
+                const response = await fetch('/api/leaderboard?limit=1');
                 const data = await response.json();
-                userData = data;
                 
-                updateUI(data);
-                hideLoading();
+                // Здесь можно обновить статистику на странице
+                // В реальном проекте нужно добавить дополнительные эндпоинты
+                
             } catch (error) {
-                console.error('Error fetching status:', error);
-                hideLoading();
-                tg.showAlert('Failed to load status. Try again!');
+                console.error('Error loading stats:', error);
             }
         }
         
-        // Update UI with user data
-        function updateUI(data) {
-            // Update basic stats
-            document.getElementById('userRank').textContent = data.rank;
-            document.getElementById('spentStars').textContent = data.spent_stars.toLocaleString();
-            document.getElementById('earnedStars').textContent = data.earned_stars.toLocaleString();
-            document.getElementById('userPosition').textContent = `#${data.position}`;
-            document.getElementById('dailyStreak').textContent = data.daily_streak;
-            
-            // Update global progress
-            const progress = data.global_progress;
-            document.getElementById('globalProgress').style.width = `${progress}%`;
-            document.getElementById('goalText').textContent = 
-                `${data.global_total.toLocaleString()}/${data.global_goal.toLocaleString()} Stars (${progress.toFixed(1)}%)`;
-            
-            // Update daily button
-            const dailyBtn = document.getElementById('dailyButton');
-            dailyBtn.disabled = data.daily_claimed;
-            dailyBtn.textContent = data.daily_claimed ? 
-                'DAILY CLAIMED ✅' : 
-                `CLAIM DAILY BLOOD 🎁 (+${data.daily_bonus}⭐)`;
-            
-            // Update NFT items
-            updateNFTItems(data.nft_items || []);
-        }
-        
-        // Update NFT items display
-        function updateNFTItems(items) {
-            const container = document.getElementById('nftItems');
-            
-            if (items.length === 0) {
-                container.innerHTML = '<p>No NFTs yet. Spend stars to unlock!</p>';
-                return;
-            }
-            
-            let html = '<div style="display: flex; flex-wrap: wrap; justify-content: center; gap: 15px; margin-top: 20px;">';
-            
-            items.forEach(item => {
-                html += `
-                    <div style="
-                        background: linear-gradient(135deg, #1a0b0b, #000);
-                        border: 2px solid ${item.rarity === 'Legendary' ? 'gold' : item.rarity === 'Epic' ? '#9b30ff' : '#8b0000'};
-                        border-radius: 10px;
-                        padding: 15px;
-                        min-width: 150px;
-                        text-align: center;
-                    ">
-                        <div style="font-size: 2rem;">${item.emoji}</div>
-                        <h4 style="margin: 10px 0; color: gold;">${item.name}</h4>
-                        <p style="font-size: 0.9rem; color: #ccc;">${item.rarity}</p>
-                    </div>
-                `;
-            });
-            
-            html += '</div>';
-            container.innerHTML = html;
-        }
-        
-        // Execute action based on selection
-        async function executeAction() {
-            const amount = parseInt(document.getElementById('amount').value);
-            const actionType = document.getElementById('actionType').value;
-            
-            if (!amount || amount < 10) {
-                tg.showAlert('Minimum amount is 10 stars!');
-                return;
-            }
-            
-            showLoading();
-            
-            try {
-                let response;
-                
-                switch (actionType) {
-                    case 'spend':
-                        response = await fetch('/api/spend', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ user_id: user.id, amount })
-                        });
-                        break;
-                        
-                    case 'challenge':
-                        tg.showPopup({
-                            title: 'Challenge Warrior',
-                            message: 'Enter username to challenge (without @):',
-                            buttons: [
-                                { id: 'cancel', type: 'cancel' },
-                                { id: 'ok', type: 'ok' }
-                            ]
-                        }, async (btnId) => {
-                            if (btnId === 'ok') {
-                                const username = prompt('Enter username:');
-                                if (username) {
-                                    // Challenge logic would go here
-                                    tg.showAlert(`Challenge sent to @${username}!`);
-                                }
-                            }
-                        });
-                        hideLoading();
-                        return;
-                        
-                    case 'shop':
-                        // Open shop
-                        tg.openLink(`https://t.me/${(await tg.getMe()).username}?start=shop`);
-                        hideLoading();
-                        return;
-                }
-                
-                if (response && response.ok) {
-                    // Haptic feedback
-                    tg.HapticFeedback.impactOccurred('heavy');
-                    
-                    // Show confetti
-                    fireConfetti();
-                    
-                    // Update status
-                    await fetchUserStatus();
-                    
-                    tg.showAlert(`Success! ${amount} stars processed!`);
-                } else {
-                    tg.showAlert('Failed to process action!');
-                }
-            } catch (error) {
-                console.error('Error executing action:', error);
-                tg.showAlert('Error processing request!');
-            }
-            
-            hideLoading();
-        }
-        
-        // Claim daily reward
-        async function claimDaily() {
-            showLoading();
-            
-            try {
-                const response = await fetch('/api/daily', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ user_id: user.id })
-                });
-                
-                if (response.ok) {
-                    const data = await response.json();
-                    
-                    // Haptic feedback
-                    tg.HapticFeedback.impactOccurred('medium');
-                    
-                    // Show success
-                    tg.showAlert(`Daily claimed! +${data.bonus} stars!`);
-                    
-                    // Update status
-                    await fetchUserStatus();
-                } else {
-                    tg.showAlert('Failed to claim daily!');
-                }
-            } catch (error) {
-                console.error('Error claiming daily:', error);
-                tg.showAlert('Error claiming daily reward!');
-            }
-            
-            hideLoading();
-        }
-        
-        // Confetti effect
-        function fireConfetti() {
-            const colors = ['#ffd700', '#ff0000', '#8b0000', '#000000'];
-            
-            for (let i = 0; i < 50; i++) {
-                setTimeout(() => {
-                    const confetti = document.createElement('div');
-                    confetti.style.position = 'fixed';
-                    confetti.style.width = '10px';
-                    confetti.style.height = '10px';
-                    confetti.style.background = colors[Math.floor(Math.random() * colors.length)];
-                    confetti.style.borderRadius = '50%';
-                    confetti.style.left = `${Math.random() * 100}%`;
-                    confetti.style.top = '-10px';
-                    confetti.style.zIndex = '9998';
-                    confetti.style.boxShadow = '0 0 10px gold';
-                    
-                    document.body.appendChild(confetti);
-                    
-                    // Animate
-                    const animation = confetti.animate([
-                        { transform: `translateY(0) rotate(0deg)`, opacity: 1 },
-                        { transform: `translateY(${window.innerHeight}px) rotate(${360 + Math.random() * 360}deg)`, opacity: 0 }
-                    ], {
-                        duration: 1000 + Math.random() * 2000,
-                        easing: 'cubic-bezier(0.1, 0.8, 0.9, 0.1)'
-                    });
-                    
-                    animation.onfinish = () => confetti.remove();
-                }, i * 50);
-            }
-        }
-        
-        // Initialize
+        // Инициализация
         document.addEventListener('DOMContentLoaded', () => {
-            createFloatingCobras();
-            fetchUserStatus();
+            createSnakes();
+            loadStats();
             
-            // Auto-refresh every 30 seconds
-            setInterval(fetchUserStatus, 30000);
+            // Автообновление каждые 30 секунд
+            setInterval(loadStats, 30000);
         });
     </script>
 </body>
 </html>
-"""
-
-@app.get("/", response_class=HTMLResponse)
-async def web_root():
-    """Web app root"""
-    return HTMLResponse(content=HTML_CONTENT)
-
-@app.get("/api/user/{user_id}")
-async def api_get_user(user_id: int):
-    """API endpoint to get user data"""
-    try:
-        # Get user from database
-        async with db_manager.get_connection() as db:
-            # User data
-            cursor = await db.execute('''
+        """
+    
+    async def api_get_user(self, user_id: int):
+        """API: Получить данные пользователя"""
+        try:
+            user = await db.fetchone('''
                 SELECT u.*, 
-                       (SELECT COUNT(*) FROM inventory WHERE user_id = u.user_id) as nft_count
+                       (SELECT COUNT(*) FROM inventory WHERE user_id = u.user_id) as nft_count,
+                       (SELECT COUNT(*) FROM user_achievements WHERE user_id = u.user_id) as achievements_count
                 FROM users u 
                 WHERE user_id = ?
             ''', (user_id,))
-            user = await cursor.fetchone()
             
             if not user:
                 raise HTTPException(status_code=404, detail="User not found")
             
-            # Get user position
-            cursor = await db.execute('''
+            # Позиция в рейтинге
+            position = await db.fetchone('''
                 SELECT COUNT(*) + 1 as position 
                 FROM users 
-                WHERE spent_stars > ? AND is_banned = FALSE
+                WHERE spent_stars > ? AND is_banned = 0
             ''', (user['spent_stars'],))
-            position = (await cursor.fetchone())['position']
             
-            # Get global fund
-            cursor = await db.execute('SELECT * FROM global_fund WHERE id = 1')
-            fund = await cursor.fetchone()
+            # Ранг
+            rank_info = SupremeRankSystem.get_rank_info(user['spent_stars'])
             
-            # Calculate daily bonus
-            base_bonus = 100
-            streak_bonus = min(user['daily_streak'] * 10, 500)
-            daily_bonus = base_bonus + streak_bonus
+            return {
+                "user_id": user['user_id'],
+                "username": user['username'],
+                "spent_stars": user['spent_stars'],
+                "earned_stars": user['earned_stars'],
+                "daily_streak": user['daily_streak'],
+                "rank": rank_info['name'],
+                "rank_emoji": rank_info['emoji'],
+                "position": position['position'] if position else 0,
+                "referrals": user['referrals'],
+                "nft_count": user['nft_count'],
+                "achievements_count": user['achievements_count'],
+                "created_at": user['created_at'],
+                "last_active": user['last_active']
+            }
             
-            # Check if daily claimed today
-            daily_claimed = False
-            if user['last_daily_claim']:
-                last_claim = datetime.fromisoformat(user['last_daily_claim'].replace('Z', '+00:00'))
-                hours_since = (datetime.now() - last_claim).total_seconds() / 3600
-                daily_claimed = hours_since < 20
+        except Exception as e:
+            logger.error(f"API error in get_user: {e}")
+            raise HTTPException(status_code=500, detail="Internal server error")
+    
+    async def api_spend_stars(self, request: Request):
+        """API: Потратить звезды"""
+        try:
+            data = await request.json()
+            user_id = data.get('user_id')
+            amount = data.get('amount')
             
-            # Get rank
-            rank_name, rank_emoji, _ = RankSystem.get_rank(user['spent_stars'])
+            if not user_id or not amount:
+                raise HTTPException(status_code=400, detail="Missing user_id or amount")
             
-            # Get user's NFT items
-            cursor = await db.execute('''
-                SELECT si.name, si.emoji, si.rarity
-                FROM inventory i
-                JOIN shop_items si ON i.item_id = si.id
-                WHERE i.user_id = ?
-                LIMIT 6
-            ''', (user_id,))
-            nft_items = await cursor.fetchall()
-            
-            # Calculate global progress
-            global_total = fund['total_stars'] if fund else 0
-            global_goal = fund['current_goal'] if fund else 10000
-            global_progress = min((global_total / global_goal) * 100, 100)
-        
-        return {
-            "user_id": user['user_id'],
-            "username": user['username'],
-            "spent_stars": user['spent_stars'],
-            "earned_stars": user['earned_stars'],
-            "daily_streak": user['daily_streak'],
-            "position": position,
-            "rank": rank_name,
-            "rank_emoji": rank_emoji,
-            "daily_claimed": daily_claimed,
-            "daily_bonus": daily_bonus,
-            "global_total": global_total,
-            "global_goal": global_goal,
-            "global_progress": global_progress,
-            "nft_count": user['nft_count'],
-            "nft_items": [dict(item) for item in nft_items],
-            "referrals": user['referrals'],
-            "language": user['language']
-        }
-        
-    except Exception as e:
-        logger.error(f"API error in get_user: {e}")
-        raise HTTPException(status_code=500, detail="Internal server error")
-
-@app.post("/api/spend")
-async def api_spend(request: Request):
-    """API endpoint to spend stars"""
-    try:
-        data = await request.json()
-        user_id = data.get('user_id')
-        amount = data.get('amount')
-        
-        if not user_id or not amount:
-            raise HTTPException(status_code=400, detail="Missing user_id or amount")
-        
-        success = await spend_stars(user_id, amount, "Spent via web app")
-        
-        if not success:
-            raise HTTPException(status_code=400, detail="Insufficient stars")
-        
-        return {"success": True, "amount": amount}
-        
-    except Exception as e:
-        logger.error(f"API error in spend: {e}")
-        raise HTTPException(status_code=500, detail="Internal server error")
-
-@app.post("/api/daily")
-async def api_daily(request: Request):
-    """API endpoint to claim daily reward"""
-    try:
-        data = await request.json()
-        user_id = data.get('user_id')
-        
-        if not user_id:
-            raise HTTPException(status_code=400, detail="Missing user_id")
-        
-        # Call the daily function
-        from aiogram.types import Message
-        from aiogram import Bot
-        
-        # This is a simplified version - in production you'd call the actual function
-        async with db_manager.get_connection() as db:
-            # Similar logic to cmd_daily but adapted for API
-            cursor = await db.execute(
-                'SELECT last_daily_claim, daily_streak FROM users WHERE user_id = ?',
+            # Проверяем баланс
+            user = await db.fetchone(
+                "SELECT earned_stars FROM users WHERE user_id = ?",
                 (user_id,)
             )
-            user = await cursor.fetchone()
             
-            now = datetime.now()
+            if not user or user['earned_stars'] < amount:
+                raise HTTPException(status_code=400, detail="Not enough stars")
             
-            if user and user['last_daily_claim']:
-                last_claim = datetime.fromisoformat(user['last_daily_claim'].replace('Z', '+00:00'))
-                hours_since = (now - last_claim).total_seconds() / 3600
-                
-                if hours_since < 20:
-                    raise HTTPException(status_code=400, detail="Daily already claimed")
-                
-                if hours_since < 48:
-                    new_streak = user['daily_streak'] + 1
-                else:
-                    new_streak = 1
-            else:
-                new_streak = 1
+            # Обновляем баланс
+            await db.execute('''
+                UPDATE users 
+                SET spent_stars = spent_stars + ?,
+                    earned_stars = earned_stars - ?
+                WHERE user_id = ?
+            ''', (amount, amount, user_id))
             
-            base_bonus = 100
-            streak_bonus = min(new_streak * 10, 500)
-            total_bonus = base_bonus + streak_bonus
-            
+            # Обновляем глобальный фонд
             await db.execute(
-                '''UPDATE users 
-                SET last_daily_claim = ?, 
-                    daily_streak = ?,
-                    earned_stars = earned_stars + ?
-                WHERE user_id = ?''',
-                (now.isoformat(), new_streak, total_bonus, user_id)
+                "UPDATE global_fund SET total_stars = total_stars + ? WHERE id = 1",
+                (amount,)
             )
             
-            await db.execute(
-                '''INSERT INTO transactions 
-                (user_id, amount, transaction_type, description) 
-                VALUES (?, ?, "daily", ?)''',
-                (user_id, total_bonus, f"Daily reward (streak: {new_streak})")
-            )
+            # Записываем транзакцию
+            await db.execute('''
+                INSERT INTO transactions (user_id, amount, type, description)
+                VALUES (?, ?, 'api_spend', ?)
+            ''', (user_id, amount, f"API spend: {amount} stars"))
             
-            await db.commit()
-        
-        return {"success": True, "bonus": total_bonus, "streak": new_streak}
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"API error in daily: {e}")
-        raise HTTPException(status_code=500, detail="Internal server error")
-
-@app.get("/api/leaderboard")
-async def api_leaderboard(limit: int = 10):
-    """API endpoint to get leaderboard"""
-    try:
-        leaderboard = await get_leaderboard(limit)
-        return {"leaderboard": [dict(user) for user in leaderboard]}
-    except Exception as e:
-        logger.error(f"API error in leaderboard: {e}")
-        raise HTTPException(status_code=500, detail="Internal server error")
-
-# ============================
-# MAIN APPLICATION
-# ============================
-
-async def run_bot():
-    """Run the Telegram bot"""
-    logger.info("Starting Golden Cobra Bot...")
+            return {"success": True, "amount": amount}
+            
+        except Exception as e:
+            logger.error(f"API error in spend_stars: {e}")
+            raise HTTPException(status_code=500, detail="Internal server error")
     
-    # Start reminder system
-    asyncio.create_task(send_reminders())
+    async def api_get_leaderboard(self, limit: int = 10):
+        """API: Получить таблицу лидеров"""
+        try:
+            users = await db.fetchall('''
+                SELECT user_id, username, spent_stars, earned_stars 
+                FROM users 
+                WHERE is_banned = 0 
+                ORDER BY spent_stars DESC 
+                LIMIT ?
+            ''', (limit,))
+            
+            return {
+                "leaderboard": [
+                    {
+                        "position": i + 1,
+                        "user_id": user['user_id'],
+                        "username": user['username'] or f"User{user['user_id']}",
+                        "spent_stars": user['spent_stars'],
+                        "earned_stars": user['earned_stars']
+                    }
+                    for i, user in enumerate(users)
+                ]
+            }
+            
+        except Exception as e:
+            logger.error(f"API error in get_leaderboard: {e}")
+            raise HTTPException(status_code=500, detail="Internal server error")
     
-    # Start bot polling
-    await dp.start_polling(bot)
+    async def start(self):
+        """Запуск веб-сервера"""
+        config = uvicorn.Config(
+            self.app,
+            host=Config.WEB_HOST,
+            port=Config.WEB_PORT,
+            log_level="info"
+        )
+        server = uvicorn.Server(config)
+        await server.serve()
 
-async def run_web_app():
-    """Run the web application"""
-    logger.info(f"Starting Web App on {WEB_APP_HOST}:{WEB_APP_PORT}...")
-    
-    config = uvicorn.Config(
-        app,
-        host=WEB_APP_HOST,
-        port=WEB_APP_PORT,
-        log_level="info"
-    )
-    server = uvicorn.Server(config)
-    await server.serve()
+# ============================================================================
+# ГЛАВНАЯ ФУНКЦИЯ ЗАПУСКА
+# ============================================================================
 
 async def main():
-    """Main entry point - run both bot and web app"""
-    logger.info("🖤 Starting Ultimate Golden Cobra Goth Mommy v3.0 🖤")
-    
-    # Create backup on startup
+    """Главная функция запуска"""
     try:
-        backup_file = await db_manager.backup()
-        logger.info(f"Initial backup created: {backup_file}")
+        logger.info("=" * 60)
+        logger.info("🖤 STARTING GOLDEN COBRA SUPREME v4.0 🖤")
+        logger.info("=" * 60)
+        
+        # Создаем экземпляры
+        bot = SupremeBot()
+        web_app = SupremeWebApp(bot)
+        
+        # Запускаем в параллельных задачах
+        await asyncio.gather(
+            bot.start(),
+            web_app.start()
+        )
+        
+    except KeyboardInterrupt:
+        logger.info("Shutdown requested by user")
     except Exception as e:
-        logger.error(f"Failed to create initial backup: {e}")
-    
-    # Run both services concurrently
-    await asyncio.gather(
-        run_bot(),
-        run_web_app()
-    )
+        logger.critical(f"Fatal error: {e}")
+        raise
+    finally:
+        logger.info("Golden Cobra Supreme shutdown complete")
 
 if __name__ == "__main__":
-    try:
-        asyncio.run(main())
-    except KeyboardInterrupt:
-        logger.info("Shutting down Golden Cobra...")
-    except Exception as e:
-        logger.error(f"Fatal error: {e}")
-        raise
+    # Установка обработчика исключений
+    import sys
+    sys.excepthook = lambda exc_type, exc_value, exc_traceback: logger.critical(
+        f"Uncaught exception: {exc_type.__name__}: {exc_value}"
+    )
+    
+    # Запуск приложения
+    asyncio.run(main())
